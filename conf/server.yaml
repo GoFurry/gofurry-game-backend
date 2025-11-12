@@ -1,0 +1,90 @@
+# 节点名称, 用于初始化雪花算法
+cluster_id : 1
+
+# 服务器基本配置
+server:
+  app_name: "GoFurry-Game" # 名称
+  app_version: "v1.0.0" # 版本
+  mode: "debug" # debug !debug
+  ip_address: "[::1]" # 服务器 ip
+  port: "9999" # 服务器端口
+  memory_limit: 1 # 服务器内存限制
+
+# key
+key:
+  tls_key: "./conf/tls.key"
+  tls_pem: "./conf/tls.pem"
+
+# redis
+redis:
+  redis_addr: "192.168.153.121:6379" # redis ip
+  redis_password: "123456" # redis 密码
+
+# kafka
+#kafka:
+#  kafka_user: "" # kafka 用户名
+#  kafka_password: 123456 # kafka 密码
+
+# postgres
+database:
+  db_name: "gfg" # 数据库名称
+  db_username: "postgres" # 拥有者名称
+  db_password: "123456" # 数据库密码
+  db_host: "192.168.153.121" # 数据库 ip
+  db_port: "5432" # 数据库端口
+
+# 日志
+log:
+  log_rotation_count: 10 # 日志保存个数
+  log_path: "var/log/gofurry-cloud/log" # 日志保存路径
+  log_level: "debug" # 日志保存级别
+  log_choke_length: 1000 # 日志流长度
+
+# 邮箱
+email:
+  email_host: "smtp.qq.com" # smtp服务地址
+  email_port: 587 # smtp服务端口
+  email_user: "1263842393@qq.com" # 用户名
+  email_password: "ozomtagkwickgebh" # 密钥
+
+# 多线程
+thread:
+  ws_status_receive_thread: 20 # ws接收
+  ws_subscribe_send_cache: 30 # ws发送
+  steam_app_info_thread: 20 # 请求 external
+  event_publish_thread: 30 # 事件发布
+
+# github三方
+github:
+  client_id: "Ov23li2Z41kRvA4CKDV2" # OAuth客户端id
+  client_secret: "87ea39897fcd27f236fc6651deebca46999a6999" # 密钥
+  redirect_url: "https://127.0.0.1:9999/api/util/oauth/github" # 请求地址
+
+# gitee三方
+gitee:
+  client_id: "5466d58d2bf296b04ec85026440ac0f65c4378dc95f296a45fe016a7920e6cef" # OAuth客户端id
+  client_secret: "4c228f9eb916546ecc567c3ee071449fa3a5009eed6617f44f685ec2261232fa" # 密钥
+  redirect_url: "https://127.0.0.1:9999/api/util/oauth/gitee" # 请求地址
+
+middleware:
+  swagger:
+    is_on: "on" # on off 默认 off
+    file_path: "./docs/swagger.json"
+    base_path: "/"
+    path: "/swagger"
+    title: "gofurry-nav-api"
+  cors:
+    allow_origins: "https://www.go-furry.com,https://go-furry.com"
+
+waf:
+  waf_switch: "on" # 是否开启 on off
+  conf_path: "./conf/coraza.conf" # 拦截规则配置文件
+
+proxy:
+  url: "http://127.0.0.1:7897" # 代理服务器地址
+
+resource:
+  bg_image_path: "E:/test/image" # 背景图片存储地址
+  bg_resize_image_path: "E:/test/image1" # 背景图片存储地址
+  image_exts: ".jpg,.jpeg,.png,.svg,.webp" # 支持图片的格式
+  geolite2_path: "./data/"
