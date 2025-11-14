@@ -8,7 +8,7 @@ package common
 
 // 项目
 const (
-	COMMON_PROJECT_NAME = "gf-nav"          // 项目名
+	COMMON_PROJECT_NAME = "gf-game"         // 项目名
 	COMMON_AUTH_SALT    = "GoFurry20250816" // 盐
 	COMMON_AUTH_CURRENT = "currentUser"     // 当前用户
 )

@@ -10,6 +10,10 @@ server:
   port: "9999" # 服务器端口
   memory_limit: 1 # 服务器内存限制
 
+auth:
+  auth_salt: "GoFurry20251024@wolf" # md5加盐
+  jwt_secret: "GolangNotFurryTho" # JWT
+
 # key
 key:
   tls_key: "./conf/tls.key"

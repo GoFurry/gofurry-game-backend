@@ -30,6 +30,12 @@ type serverConfig struct {
 	Waf        WafConfig        `yaml:"waf"`
 	Proxy      ProxyConfig      `yaml:"proxy"`
 	Resource   ResourceConfig   `yaml:"resource"`
+	Auth       AuthConfig       `yaml:"auth"`
+}
+
+type AuthConfig struct {
+	AuthSalt  string `yaml:"auth_salt"`
+	JwtSecret string `yaml:"jwt_secret"`
 }
 
 type ResourceConfig struct {
