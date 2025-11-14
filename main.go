@@ -58,14 +58,22 @@ WantedBy=multi-user.target`,
 
 	if len(os.Args) > 1 {
 		if os.Args[1] == "install" {
-			s.Install()
-			log.Info("服务安装成功.")
+			err = s.Install()
+			if err != nil {
+				log.Error("服务安装失败: ", err)
+			} else {
+				log.Info("服务安装成功.")
+			}
 			return
 		}
 
 		if os.Args[1] == "uninstall" {
-			s.Uninstall()
-			log.Info("服务卸载成功.")
+			err = s.Uninstall()
+			if err != nil {
+				log.Error("服务卸载失败: ", err)
+			} else {
+				log.Info("服务卸载成功.")
+			}
 			return
 		}
 
