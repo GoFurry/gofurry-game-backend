@@ -1,7 +1,6 @@
 package service
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"math/rand"
@@ -15,6 +14,7 @@ import (
 	"github.com/GoFurry/gofurry-game-backend/common/log"
 	cs "github.com/GoFurry/gofurry-game-backend/common/service"
 	"github.com/GoFurry/gofurry-game-backend/common/util"
+	"github.com/bytedance/sonic"
 
 	gd "github.com/GoFurry/gofurry-game-backend/apps/game/dao"
 	gm "github.com/GoFurry/gofurry-game-backend/apps/game/models"
@@ -290,7 +290,7 @@ func loadFromRedis() (tagMapping map[int64][]int64, tagIDs []int64, err common.G
 	}
 	// 反序列化map[int64][]int64
 	tagMapping = make(map[int64][]int64)
-	if err := json.Unmarshal([]byte(mappingStr), &tagMapping); err != nil {
+	if err := sonic.Unmarshal([]byte(mappingStr), &tagMapping); err != nil {
 		log.Error("tagMapping反序列化失败: " + err.Error())
 		return nil, nil, common.NewServiceError("缓存数据格式错误")
 	}
@@ -301,7 +301,7 @@ func loadFromRedis() (tagMapping map[int64][]int64, tagIDs []int64, err common.G
 		return nil, nil, nil
 	}
 	// 反序列化[]int64
-	if err := json.Unmarshal([]byte(idsStr), &tagIDs); err != nil {
+	if err := sonic.Unmarshal([]byte(idsStr), &tagIDs); err != nil {
 		log.Error("tagIDs反序列化失败: " + err.Error())
 		return nil, nil, common.NewServiceError("缓存数据格式错误")
 	}
@@ -312,7 +312,7 @@ func loadFromRedis() (tagMapping map[int64][]int64, tagIDs []int64, err common.G
 // 保存数据到Redis
 func saveToRedis(tagMapping map[int64][]int64, tagIDs []int64) {
 	// 序列化tagMapping并保存
-	mappingBytes, err := json.Marshal(tagMapping)
+	mappingBytes, err := sonic.Marshal(tagMapping)
 	if err != nil {
 		log.Error("tagMapping序列化失败: " + err.Error())
 		return
@@ -322,7 +322,7 @@ func saveToRedis(tagMapping map[int64][]int64, tagIDs []int64) {
 	}
 
 	// 序列化tagIDs并保存
-	idsBytes, err := json.Marshal(tagIDs)
+	idsBytes, err := sonic.Marshal(tagIDs)
 	if err != nil {
 		log.Error("tagIDs序列化失败: " + err.Error())
 		return

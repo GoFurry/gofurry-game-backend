@@ -7,7 +7,7 @@ server:
   app_version: "v1.0.0" # 版本
   mode: "debug" # debug !debug
   ip_address: "[::1]" # 服务器 ip
-  port: "9999" # 服务器端口
+  port: "9998" # 服务器端口
   memory_limit: 1 # 服务器内存限制
 
 auth:

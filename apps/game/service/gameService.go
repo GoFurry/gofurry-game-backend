@@ -5,8 +5,9 @@ import (
 	"github.com/GoFurry/gofurry-game-backend/apps/game/models"
 	"github.com/GoFurry/gofurry-game-backend/common"
 	"github.com/GoFurry/gofurry-game-backend/common/log"
+	cs "github.com/GoFurry/gofurry-game-backend/common/service"
 	"github.com/GoFurry/gofurry-game-backend/common/util"
-	"github.com/goccy/go-json"
+	"github.com/bytedance/sonic"
 )
 
 type gameService struct{}
@@ -46,33 +47,107 @@ func (s gameService) GetGameList(num string, lang string) (gameVo []models.GameR
 			newGameVo.Name = v.Name
 			newGameVo.Info = v.Info
 		}
-		jsonErr := json.Unmarshal([]byte(v.Developers), &newGameVo.Developers)
+		jsonErr := sonic.Unmarshal([]byte(v.Developers), &newGameVo.Developers)
 		if jsonErr != nil {
 			log.Error(v.Name, " ([]byte(*v.Developers), &newGameVo.Developers) err: ", jsonErr)
 		}
-		jsonErr = json.Unmarshal([]byte(v.Publishers), &newGameVo.Publishers)
+		jsonErr = sonic.Unmarshal([]byte(v.Publishers), &newGameVo.Publishers)
 		if jsonErr != nil {
 			log.Error(v.Name, " ([]byte(*v.Publishers), &newGameVo.Publishers) err: ", jsonErr)
 		}
 		if v.Resources != nil {
-			jsonErr = json.Unmarshal([]byte(*v.Resources), &newGameVo.Resources)
+			jsonErr = sonic.Unmarshal([]byte(*v.Resources), &newGameVo.Resources)
 			if jsonErr != nil {
 				log.Error(v.Name, " ([]byte(*v.Resources), &newGameVo.Resources) err: ", jsonErr)
 			}
 		}
 		if v.Groups != nil {
-			jsonErr = json.Unmarshal([]byte(*v.Groups), &newGameVo.Groups)
+			jsonErr = sonic.Unmarshal([]byte(*v.Groups), &newGameVo.Groups)
 			if jsonErr != nil {
 				log.Error(v.Name, " ([]byte(*v.Groups), &newGameVo.Groups) err: ", jsonErr)
 			}
 		}
 		if v.Links != nil {
-			jsonErr = json.Unmarshal([]byte(*v.Links), &newGameVo.Links)
+			jsonErr = sonic.Unmarshal([]byte(*v.Links), &newGameVo.Links)
 			if jsonErr != nil {
 				log.Error(v.Name, " ([]byte(*v.Links), &newGameVo.Links) err: ", jsonErr)
 			}
 		}
 		gameVo = append(gameVo, newGameVo)
 	}
+	return
+}
+
+func (s gameService) GetGameMainList() (res models.GameMainInfoVo, err common.GFError) {
+	jsonStr, err := cs.GetString("game-info:latest")
+	if err != nil {
+		return res, err
+	}
+	jsonErr := sonic.Unmarshal([]byte(jsonStr), &res.Latest)
+	if jsonErr != nil {
+		return res, common.NewServiceError(err.GetMsg())
+	}
+
+	jsonStr, err = cs.GetString("game-info:recent")
+	if err != nil {
+		return res, err
+	}
+	jsonErr = sonic.Unmarshal([]byte(jsonStr), &res.Recent)
+	if jsonErr != nil {
+		return res, common.NewServiceError(err.GetMsg())
+	}
+
+	jsonStr, err = cs.GetString("game-info:hot")
+	if err != nil {
+		return res, err
+	}
+	jsonErr = sonic.Unmarshal([]byte(jsonStr), &res.Hot)
+	if jsonErr != nil {
+		return res, common.NewServiceError(err.GetMsg())
+	}
+
+	jsonStr, err = cs.GetString("game-info:free")
+	if err != nil {
+		return res, err
+	}
+	jsonErr = sonic.Unmarshal([]byte(jsonStr), &res.Free)
+	if jsonErr != nil {
+		return res, common.NewServiceError(err.GetMsg())
+	}
+	return
+}
+
+func (s gameService) GetPanelMainList() (res models.GameMainPanelVo, err common.GFError) {
+	jsonStr, err := cs.GetString("game-panel:top-player-count")
+	if err != nil {
+		return res, err
+	}
+	jsonErr := sonic.Unmarshal([]byte(jsonStr), &res.CountVo)
+	if jsonErr != nil {
+		return res, common.NewServiceError(err.GetMsg())
+	}
+
+	jsonStr, err = cs.GetString("game-panel:top-price")
+	if err != nil {
+		return res, err
+	}
+	jsonErr = sonic.Unmarshal([]byte(jsonStr), &res.PriceVo)
+	if jsonErr != nil {
+		return res, common.NewServiceError(err.GetMsg())
+	}
+
+	return
+}
+
+func (s gameService) GetUpdateNews() (res models.UpdateNewsVo, err common.GFError) {
+	jsonStr, err := cs.GetString("game-news:latest")
+	if err != nil {
+		return res, err
+	}
+	jsonErr := sonic.Unmarshal([]byte(jsonStr), &res)
+	if jsonErr != nil {
+		return res, common.NewServiceError(err.GetMsg())
+	}
+
 	return
 }

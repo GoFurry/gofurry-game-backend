@@ -8,9 +8,11 @@ package util
 
 import (
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
+
 	"github.com/PuerkitoBio/goquery"
+	"github.com/bytedance/sonic"
+
 	"io"
 	"net/http"
 	"net/url"
@@ -43,7 +45,7 @@ func GetByHttp(url string) (string, error) {
 
 func PostByHttp(url, contentType string, params map[string]any) (string, error) {
 	// map转json
-	jsonData, err := json.Marshal(params)
+	jsonData, err := sonic.Marshal(params)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "marshal json failed, err:%v", err)
 		return "", err

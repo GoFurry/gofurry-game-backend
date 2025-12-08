@@ -7,6 +7,7 @@ import (
 	"runtime/debug"
 	"syscall"
 
+	"github.com/GoFurry/gofurry-game-backend/apps/schedule"
 	"github.com/GoFurry/gofurry-game-backend/common"
 	cs "github.com/GoFurry/gofurry-game-backend/common/service"
 	"github.com/GoFurry/gofurry-game-backend/roof/env"
@@ -103,6 +104,9 @@ func InitOnStart() {
 	cs.InitRedisOnStart()
 	// 初始化时间调度
 	cs.InitTimeWheelOnStart()
+
+	// 初始化定时任务
+	schedule.InitScheduleOnStart()
 }
 
 func (gf *goFurry) Start(s service.Service) error {

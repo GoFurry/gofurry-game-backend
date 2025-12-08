@@ -8,12 +8,12 @@ package log
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"runtime"
 	"strings"
 
 	"github.com/GoFurry/gofurry-game-backend/roof/env"
+	"github.com/bytedance/sonic"
 	"github.com/sirupsen/logrus"
 )
 
@@ -101,7 +101,7 @@ func (l *LoggerFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	newLog := ""
 	dataInfo := ""
 	if len(targetMap) > 0 {
-		dataJson, _ := json.Marshal(targetMap)
+		dataJson, _ := sonic.Marshal(targetMap)
 		dataInfo = string(dataJson)
 	}
 	msg := entry.Message

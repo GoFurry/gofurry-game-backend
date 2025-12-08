@@ -13,7 +13,10 @@ import (
  */
 
 func gameApi(g fiber.Router) {
-	g.Get("/info/list", game.GameApi.GetGameList) // 获取前 num 条游戏记录
+	g.Get("/info/list", game.GameApi.GetGameList)       // 获取前 num 条游戏记录
+	g.Get("/info/main", game.GameApi.GetGameMainList)   // 获取首页展示数据
+	g.Get("/panel/main", game.GameApi.GetPanelMainList) // 获取首页面板数据
+	g.Get("/update/latest", game.GameApi.GetUpdateNews) // 获取首页更新公告
 }
 
 func recommendApi(g fiber.Router) {

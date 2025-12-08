@@ -1,6 +1,7 @@
 package models
 
 import (
+	rm "github.com/GoFurry/gofurry-game-backend/apps/review/models"
 	cm "github.com/GoFurry/gofurry-game-backend/common/models"
 )
 
@@ -45,4 +46,113 @@ type GameRespVo struct {
 	Appid       string        `json:"appid"`
 	Header      string        `json:"header"`
 	Links       *[]cm.KvModel `json:"links"`
+}
+
+const TableNameGfgGameRecord = "gfg_game_record"
+
+// GfgGameRecord mapped from table <gfg_game_record>
+type GfgGameRecord struct {
+	ID          int64  `gorm:"column:id;type:bigint;primaryKey;comment:游戏记录表id" json:"id"`                              // 游戏记录表id
+	GameID      int64  `gorm:"column:game_id;type:bigint;not null;comment:游戏表id" json:"gameId,string"`                  // 游戏表id
+	Language    string `gorm:"column:language;type:character varying(255);not null;comment:支持语言" json:"language"`       // 支持语言
+	ReleaseDate string `gorm:"column:release_date;type:character varying(30);not null;comment:发行时间" json:"releaseDate"` // 发行时间
+	Platform    string `gorm:"column:platform;type:character varying(50);not null;comment:支持平台" json:"platform"`        // 支持平台
+	Developer   string `gorm:"column:developer;type:character varying(100);not null;comment:开发商" json:"developer"`      // 开发商
+	Publisher   string `gorm:"column:publisher;type:character varying(100);not null;comment:发行商" json:"publisher"`      // 发行商
+	Info        string `gorm:"column:info;type:text;not null;comment:游戏概述" json:"info"`                                 // 游戏概述
+	Cover       string `gorm:"column:cover;type:character varying(255);comment:封面图" json:"cover"`                       // 封面图
+	HotIndex    int64  `gorm:"column:hot_index;type:bigint;not null;comment:热度指数" json:"hotIndex"`                      // 热度指数
+	Lang        string `gorm:"column:lang;type:character varying(20);not null;comment:记录的语言" json:"lang"`               // 记录的语言
+	PriceList   string `gorm:"column:price_list;type:json;not null;comment:游戏价格列表" json:"priceList"`                    // 游戏价格列表
+	Initial     int64  `gorm:"column:initial;type:bigint;not null;comment:游戏价格" json:"initial"`                         // 游戏价格
+	Final       int64  `gorm:"column:final;type:bigint;not null;comment:当前价格" json:"final"`                             // 当前价格
+	Discount    int64  `gorm:"column:discount;type:bigint;not null;comment:折扣百分比" json:"discount"`                      // 折扣百分比
+}
+
+// TableName GfgGameRecord's table name
+func (*GfgGameRecord) TableName() string {
+	return TableNameGfgGameRecord
+}
+
+type GameMainInfoVo struct {
+	Latest []rm.AvgScoreResult `json:"latest"`
+	Recent []rm.AvgScoreResult `json:"recent"`
+	Hot    []rm.AvgScoreResult `json:"hot"`
+	Free   []rm.AvgScoreResult `json:"free"`
+}
+
+const TableNameGfgGamePlayerCount = "gfg_game_player_count"
+
+// GfgGamePlayerCount mapped from table <gfg_game_player_count>
+type GfgGamePlayerCount struct {
+	ID         int64        `gorm:"column:id;type:bigint;primaryKey;comment:在线人数表ID" json:"id"`                                       // 在线人数表ID
+	GameID     int64        `gorm:"column:game_id;type:bigint;not null;comment:游戏表ID" json:"gameId,string"`                           // 游戏表ID
+	Count_     int64        `gorm:"column:count;type:bigint;not null;comment:在线人数" json:"count"`                                      // 在线人数
+	CreateTime cm.LocalTime `gorm:"column:create_time;type:int;type:unsigned;not null;autoCreateTime;comment:创建时间" json:"createTime"` // 创建时间
+}
+
+// TableName GfgGamePlayerCount's table name
+func (*GfgGamePlayerCount) TableName() string {
+	return TableNameGfgGamePlayerCount
+}
+
+type PlayerTopCountVo struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	CountPeak   int64  `json:"count_peak"`
+	CountRecent int64  `json:"count_recent"`
+	CollectTime int64  `json:"collect_time"`
+	Header      string `json:"header"`
+}
+
+type TopPriceVo struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	GlobalPrice int64  `json:"global_price"`
+	ChinaPrice  int64  `json:"china_price"`
+	Discount    int64  `json:"discount"`
+	Header      string `json:"header"`
+}
+
+type GameMainPanelVo struct {
+	CountVo []PlayerTopCountVo `json:"count_vo"`
+	PriceVo []TopPriceVo       `json:"price_vo"`
+}
+
+type UpdateNewsModels struct {
+	ID       string       `json:"id"`
+	Name     string       `json:"name"`
+	PostTime cm.LocalTime `json:"post_time"`
+	Headline string       `json:"headline"`
+	Header   string       `json:"header"`
+	Author   string       `json:"author"`
+	Content  string       `json:"content"`
+	Url      string       `json:"url"`
+}
+
+type UpdateNewsVo struct {
+	NewsZh []UpdateNewsModels `json:"news_zh"`
+	NewsEn []UpdateNewsModels `json:"news_en"`
+}
+
+const TableNameGfgGameNews = "gfg_game_news"
+
+// GfgGameNews mapped from table <gfg_game_news>
+type GfgGameNews struct {
+	ID         int64        `gorm:"column:id;type:bigint;primaryKey;comment:游戏更新公告记录表id" json:"id"`                                   // 游戏更新公告记录表id
+	GameID     int64        `gorm:"column:game_id;type:bigint;not null;comment:游戏表id" json:"gameId,string"`                           // 游戏表id
+	Headline   string       `gorm:"column:headline;type:character varying(255);not null;comment:更新公告标题" json:"headline"`              // 更新公告标题
+	Content    string       `gorm:"column:content;type:text;not null;comment:更新公告内容" json:"content"`                                  // 更新公告内容
+	Index      int64        `gorm:"column:index;type:bigint;not null;comment:更新公告编号" json:"index"`                                    // 更新公告编号
+	PostTime   cm.LocalTime `gorm:"column:post_time;type:timestamp(0) without time zone;not null;comment:更新公告上传日期" json:"postTime"`   // 更新公告上传日期
+	CreateTime cm.LocalTime `gorm:"column:create_time;type:int;type:unsigned;not null;autoCreateTime;comment:采集时间" json:"createTime"` // 采集时间
+	Author     string       `gorm:"column:author;type:character varying(50);not null;comment:公告作者" json:"author"`                     // 公告作者
+	URL        string       `gorm:"column:url;type:character varying(255);not null;comment:更新公告原始地址" json:"url"`                      // 更新公告原始地址
+	Total      int64        `gorm:"column:total;type:bigint;not null;comment:公告总数" json:"total"`                                      // 公告总数
+	Lang       string       `gorm:"column:lang;type:character varying(30);not null;comment:记录的语言" json:"lang"`                        // 记录的语言
+}
+
+// TableName GfgGameNews's table name
+func (*GfgGameNews) TableName() string {
+	return TableNameGfgGameNews
 }

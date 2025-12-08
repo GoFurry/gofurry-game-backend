@@ -34,3 +34,54 @@ func (api *gameApi) GetGameList(c *fiber.Ctx) error {
 
 	return common.NewResponse(c).SuccessWithData(data)
 }
+
+// @Summary 获取首页展示数据
+// @Schemes
+// @Description 获取首页展示数据
+// @Tags Game
+// @Accept json
+// @Produce json
+// @Success 200 {object} models.GameMainInfoVo
+// @Router /api/game/info/main [Get]
+func (api *gameApi) GetGameMainList(c *fiber.Ctx) error {
+	data, err := service.GetGameService().GetGameMainList()
+	if err != nil {
+		return common.NewResponse(c).Error(err.GetMsg())
+	}
+
+	return common.NewResponse(c).SuccessWithData(data)
+}
+
+// @Summary 获取首页面板数据
+// @Schemes
+// @Description 获取首页面板数据
+// @Tags Game
+// @Accept json
+// @Produce json
+// @Success 200 {object} models.GameMainPanelVo
+// @Router /api/game/panel/main [Get]
+func (api *gameApi) GetPanelMainList(c *fiber.Ctx) error {
+	data, err := service.GetGameService().GetPanelMainList()
+	if err != nil {
+		return common.NewResponse(c).Error(err.GetMsg())
+	}
+
+	return common.NewResponse(c).SuccessWithData(data)
+}
+
+// @Summary 获取首页更新公告
+// @Schemes
+// @Description 获取首页更新公告
+// @Tags Game
+// @Accept json
+// @Produce json
+// @Success 200 {object} models.UpdateNewsVo
+// @Router /api/game/update/latest [Get]
+func (api *gameApi) GetUpdateNews(c *fiber.Ctx) error {
+	data, err := service.GetGameService().GetUpdateNews()
+	if err != nil {
+		return common.NewResponse(c).Error(err.GetMsg())
+	}
+
+	return common.NewResponse(c).SuccessWithData(data)
+}
