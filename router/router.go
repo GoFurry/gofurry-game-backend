@@ -92,6 +92,8 @@ func (router *router) Init() *fiber.App {
 	// 路由分组
 	gameApi(app.Group("/api/game"))
 	recommendApi(app.Group("/api/recommend"))
+	searchApi(app.Group("/api/search"))
+	reviewApi(app.Group("/api/review"))
 
 	app.Get("/api/swagger/doc.json", func(c *fiber.Ctx) error {
 		return c.SendFile("./docs/swagger.json")

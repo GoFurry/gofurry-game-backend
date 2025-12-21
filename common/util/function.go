@@ -31,12 +31,6 @@ import (
 
 var clusterId, _ = snowflake.NewNode(int64(env.GetServerConfig().ClusterId))
 
-var letters = []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d",
-	"e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v",
-	"w", "x", "y", "z", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N",
-	"O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
-}
-
 // 雪花算法生成新 ID
 func GenerateId() int64 {
 	id := clusterId.Generate()
@@ -153,9 +147,10 @@ func In[T comparable](target T, aimList []T) bool {
 // 生成随机验证码
 func GenerateRandomCode(length int) string {
 	//rand.Seed(time.Now().UnixNano())
+	letters := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	randCode := ""
 	for i := 1; i <= length; i++ {
-		randCode += letters[rand.Intn(len(letters))]
+		randCode += string(letters[rand.Intn(len(letters))])
 	}
 	return randCode
 }
@@ -304,4 +299,60 @@ func DecryptPassword(encryptedPassword string, privateKeyPath string) (string, e
 func FileExists(path string) bool {
 	_, err := os.Stat(path)
 	return !os.IsNotExist(err) // 不存在返回 false，存在返回 true
+}
+
+func DesensitizeIP(ip string) string {
+	if ip == "" {
+		return ""
+	}
+
+	// 先解析验证IP格式
+	ipAddr := net.ParseIP(ip)
+	if ipAddr == nil {
+		return "***"
+	}
+
+	if ipAddr.To4() != nil {
+		// IPv4
+		segments := strings.Split(ip, ".")
+		if len(segments) == 4 {
+			// 只脱敏最后一段
+			return strings.Join(segments[:3], ".") + ".***"
+		}
+	} else {
+		// IPv6
+		// 压缩格式的IPv6
+		if strings.Contains(ip, "::") {
+			parts := strings.Split(ip, "::")
+			if len(parts) == 2 {
+				if parts[1] == "" {
+					// 格式如 2001:0db8:: → 2001:0db8::*
+					return parts[0] + "::*"
+				} else if parts[0] == "" {
+					// 格式如 ::1 → ::*
+					return "::*"
+				} else {
+					// 格式如 2001:0db8::1234 → 2001:0db8::****
+					return parts[0] + "::****"
+				}
+			}
+		}
+
+		// 标准IPv6格式
+		segments := strings.Split(ip, ":")
+		segCount := len(segments)
+		if segCount > 0 {
+			// 最后一段脱敏
+			keepSegCount := segCount - 1
+			if keepSegCount < 1 {
+				keepSegCount = 0
+			}
+			keepParts := segments[:keepSegCount]
+			// 拼接保留部分
+			return strings.Join(keepParts, ":") + ":****"
+		}
+	}
+
+	// 异常情况
+	return "***"
 }

@@ -14,6 +14,7 @@ type GfgGameComment struct {
 	Score      float64      `gorm:"column:score;type:double precision;not null;comment:评分" json:"score"`                              // 评分
 	CreateTime cm.LocalTime `gorm:"column:create_time;type:int;type:unsigned;not null;autoCreateTime;comment:创建时间" json:"createTime"` // 创建时间
 	GameID     int64        `gorm:"column:game_id;type:bigint;not null;comment:游戏表ID" json:"gameId,string"`                           // 游戏表ID
+	IP         string       `gorm:"column:ip;type:character varying(50);not null;comment:ip" json:"ip"`                               // ip
 }
 
 // TableName GfgGameComment's table name
@@ -30,4 +31,20 @@ type AvgScoreResult struct {
 	Info         string  `gorm:"column:info" json:"info"`
 	InfoEn       string  `gorm:"column:info_en" json:"info_en"`
 	Header       string  `gorm:"column:header" json:"header"`
+}
+
+type AnonymousReviewRequest struct {
+	ID      string  `json:"id"` // 游戏 ID
+	Content string  `json:"content"`
+	Score   float64 `json:"score"`
+}
+
+type AnonymousReviewResponse struct {
+	Region    string       `json:"region"`
+	Score     float64      `json:"score"`
+	Content   string       `json:"content"`
+	IP        string       `json:"ip"`
+	Time      cm.LocalTime `json:"time"`
+	GameName  string       `json:"game_name"`
+	GameCover string       `json:"game_cover"`
 }

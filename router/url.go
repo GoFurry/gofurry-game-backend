@@ -3,6 +3,8 @@ package routers
 import (
 	game "github.com/GoFurry/gofurry-game-backend/apps/game/controller"
 	recommend "github.com/GoFurry/gofurry-game-backend/apps/recommend/controller"
+	review "github.com/GoFurry/gofurry-game-backend/apps/review/controller"
+	search "github.com/GoFurry/gofurry-game-backend/apps/search/controller"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -27,4 +29,13 @@ func recommendApi(g fiber.Router) {
 	g.Get("/game/CBF", recommend.RecommendApi.RecommendByCBF)     // 用 CBF 返回游戏记录
 	g.Get("/game/random", recommend.RecommendApi.GetRandomGameID) // 返回一个随机的游戏记录ID
 
+}
+
+func searchApi(g fiber.Router) {
+	g.Post("/game/simple", search.SearchApi.SimpleSearch) // 简易搜索
+}
+
+func reviewApi(g fiber.Router) {
+	g.Post("/anonymous", review.ReviewApi.SimpleSearch)    // 匿名评论
+	g.Get("/latest", review.ReviewApi.GetLatestReviewList) // 获取最新的评论列表
 }
