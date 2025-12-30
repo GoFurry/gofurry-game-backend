@@ -36,3 +36,29 @@ func (api *searchApi) SimpleSearch(c *fiber.Ctx) error {
 
 	return common.NewResponse(c).SuccessWithData(data)
 }
+
+// @Summary 分页高级搜索
+// @Schemes
+// @Description 分页高级搜索
+// @Tags Search
+// @Accept json
+// @Produce json
+// @Param body body models.SearchPageQueryRequest true "请求body"
+// @Success 200 {object} models.PageResponse
+// @Router /api/search/game/page [POST]
+func (api *searchApi) PageSearch(c *fiber.Ctx) error {
+	req := models.SearchPageQueryRequest{}
+	if err := c.BodyParser(&req); err != nil {
+		return common.NewResponse(c).Error("解析请求体失败")
+	}
+
+	req.InitPageIfAbsent()
+
+	data, err := service.GetSearchService().SearchPageQuery(req)
+	if err != nil {
+		return common.NewResponse(c).Error(err.GetMsg())
+	}
+
+	return common.NewResponse(c).SuccessWithData(data)
+
+}

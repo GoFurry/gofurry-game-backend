@@ -19,6 +19,8 @@ func gameApi(g fiber.Router) {
 	g.Get("/info/main", game.GameApi.GetGameMainList)   // 获取首页展示数据
 	g.Get("/panel/main", game.GameApi.GetPanelMainList) // 获取首页面板数据
 	g.Get("/update/latest", game.GameApi.GetUpdateNews) // 获取首页更新公告
+
+	g.Get("/tag/list", game.GameApi.GetTagList) // 获取标签列表
 }
 
 func recommendApi(g fiber.Router) {
@@ -28,11 +30,11 @@ func recommendApi(g fiber.Router) {
 	// 实现重点: 余弦相似度 特征提取-独热编码
 	g.Get("/game/CBF", recommend.RecommendApi.RecommendByCBF)     // 用 CBF 返回游戏记录
 	g.Get("/game/random", recommend.RecommendApi.GetRandomGameID) // 返回一个随机的游戏记录ID
-
 }
 
 func searchApi(g fiber.Router) {
 	g.Post("/game/simple", search.SearchApi.SimpleSearch) // 简易搜索
+	g.Post("/game/page", search.SearchApi.PageSearch)     // 复杂查询
 }
 
 func reviewApi(g fiber.Router) {

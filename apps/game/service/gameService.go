@@ -151,3 +151,7 @@ func (s gameService) GetUpdateNews() (res models.UpdateNewsVo, err common.GFErro
 
 	return
 }
+
+func (s gameService) GetTagList(lang string) (res []models.TagModelVo, err common.GFError) {
+	return dao.GetGameDao().GetTagList(lang)
+}

@@ -9,8 +9,9 @@ package models
 import (
 	"database/sql/driver"
 	"fmt"
-	"github.com/GoFurry/gofurry-game-backend/common"
 	"time"
+
+	"github.com/GoFurry/gofurry-game-backend/common"
 )
 
 type LocalTime time.Time
@@ -19,6 +20,10 @@ const (
 	timeFormat = common.TIME_FORMAT_DATE
 	zone       = "Asia/Shanghai"
 )
+
+func (t *LocalTime) Time() time.Time {
+	return time.Time(*t)
+}
 
 func (t *LocalTime) UnmarshalJSON(data []byte) (err error) {
 	now, err := time.ParseInLocation(`"`+timeFormat+`"`, string(data), time.Local)

@@ -4,6 +4,7 @@ import (
 	"github.com/GoFurry/gofurry-game-backend/apps/search/dao"
 	"github.com/GoFurry/gofurry-game-backend/apps/search/models"
 	"github.com/GoFurry/gofurry-game-backend/common"
+	cm "github.com/GoFurry/gofurry-game-backend/common/models"
 	"github.com/GoFurry/gofurry-game-backend/common/util"
 )
 
@@ -35,6 +36,14 @@ func (s searchService) SimpleSearchQuery(req models.SearchRequest) (res []models
 			newRecord.Info = game.Info
 		}
 		res = append(res, newRecord)
+	}
+	return
+}
+
+func (s searchService) SearchPageQuery(req models.SearchPageQueryRequest) (res cm.PageResponse, err common.GFError) {
+	res, dbErr := dao.GetSearchDao().Paginate(req)
+	if dbErr != nil {
+		return res, common.NewServiceError("分页查询失败.")
 	}
 	return
 }

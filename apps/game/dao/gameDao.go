@@ -2,8 +2,10 @@ package dao
 
 import (
 	"github.com/GoFurry/gofurry-game-backend/apps/game/models"
+	gm "github.com/GoFurry/gofurry-game-backend/apps/recommend/models"
 	"github.com/GoFurry/gofurry-game-backend/common"
 	"github.com/GoFurry/gofurry-game-backend/common/abstract"
+	"gorm.io/gorm"
 )
 
 var newGameDao = new(gameDao)
@@ -180,6 +182,33 @@ func (dao gameDao) GetUpdateNews(num int, lang string) (res []models.UpdateNewsM
 	}
 	if len(res) == 0 {
 		return res, common.NewDaoError("暂无游戏新闻数据")
+	}
+
+	return res, nil
+}
+
+func (dao gameDao) GetTagList(lang string) (res []models.TagModelVo, err common.GFError) {
+	var countSubQuery *gorm.DB
+	countSubQuery = dao.Gm.Table(gm.TableNameGfgTagMap).
+		Select("tag_id, COUNT(*) as game_count").
+		Group("tag_id")
+
+	nameField := "gfg_tag.name AS name"
+	if lang == "en" {
+		nameField = "gfg_tag.name_en AS name"
+	}
+
+	db := dao.Gm.Table(gm.TableNameGfgTag).
+		Joins("LEFT JOIN (?) AS tag_count ON gfg_tag.id = tag_count.tag_id", countSubQuery).
+		Select(
+			"CAST(gfg_tag.id AS VARCHAR)",
+			nameField,
+			"CAST(gfg_tag.prefix AS VARCHAR) AS prefix",
+			"COALESCE(tag_count.game_count, 0) AS game_count",
+		).Order("game_count DESC")
+
+	if dbErr := db.Find(&res).Error; dbErr != nil {
+		return res, common.NewDaoError("获取标签记录失败: " + dbErr.Error())
 	}
 
 	return res, nil

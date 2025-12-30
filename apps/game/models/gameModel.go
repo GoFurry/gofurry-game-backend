@@ -156,3 +156,10 @@ type GfgGameNews struct {
 func (*GfgGameNews) TableName() string {
 	return TableNameGfgGameNews
 }
+
+type TagModelVo struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Prefix    string `json:"prefix"`
+	GameCount int    `json:"game_count"`
+}

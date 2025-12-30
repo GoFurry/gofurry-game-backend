@@ -11,7 +11,7 @@ import (
 	"github.com/GoFurry/gofurry-game-backend/common"
 	cs "github.com/GoFurry/gofurry-game-backend/common/service"
 	"github.com/GoFurry/gofurry-game-backend/roof/env"
-	routers "github.com/GoFurry/gofurry-game-backend/router"
+	"github.com/GoFurry/gofurry-game-backend/routers"
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/kardianos/service"
 )
