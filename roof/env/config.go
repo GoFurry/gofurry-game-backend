@@ -22,6 +22,7 @@ type serverConfig struct {
 	DataBase   DataBaseConfig   `yaml:"database"`
 	Log        LogConfig        `yaml:"log"`
 	Redis      RedisConfig      `yaml:"redis"`
+	Mongodb    MongodbConfig    `yaml:"mongodb"`
 	Email      EmailConfig      `yaml:"email"`
 	Thread     ThreadConfig     `yaml:"thread"`
 	Github     GithubConfig     `yaml:"github"`
@@ -31,6 +32,15 @@ type serverConfig struct {
 	Proxy      ProxyConfig      `yaml:"proxy"`
 	Resource   ResourceConfig   `yaml:"resource"`
 	Auth       AuthConfig       `yaml:"auth"`
+}
+
+type MongodbConfig struct {
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+	Host     string `yaml:"host"`
+	Port     string `yaml:"port"`
+	AuthDB   string `yaml:"auth_db"`
+	DBName   string `yaml:"db_name"`
 }
 
 type AuthConfig struct {

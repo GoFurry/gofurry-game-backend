@@ -57,15 +57,15 @@ func (s reviewService) AddAnonymousReview(req models.AnonymousReviewRequest, c *
 	}
 
 	// 检验记录是否存在
-	_, err := dao.GetReviewDao().GetReviewByIP(req.ID, parsedIP.String())
-	if err != nil {
-		if err.GetMsg() != common.RETURN_RECORD_NOT_FOUND {
-			log.Error(err)
-			return common.NewServiceError(err.GetMsg())
-		}
-	} else {
-		return common.NewServiceError("您的 IP 已评论过该游戏, 需要修改请联系官方人员")
-	}
+	//_, err := dao.GetReviewDao().GetReviewByIP(req.ID, parsedIP.String())
+	//if err != nil {
+	//	if err.GetMsg() != common.RETURN_RECORD_NOT_FOUND {
+	//		log.Error(err)
+	//		return common.NewServiceError(err.GetMsg())
+	//	}
+	//} else {
+	//	return common.NewServiceError("您的 IP 已评论过该游戏, 需要修改请联系官方人员")
+	//}
 
 	region, queryErr := queryBaiduIP(parsedIP.String())
 	if queryErr != nil {
@@ -86,6 +86,7 @@ func (s reviewService) AddAnonymousReview(req models.AnonymousReviewRequest, c *
 		CreateTime: cm.LocalTime(time.Now()),
 		GameID:     i64ID,
 		IP:         parsedIP.String(),
+		Name:       req.Name,
 	}
 
 	return dao.GetReviewDao().Add(&newRecord)

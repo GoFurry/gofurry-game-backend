@@ -1,9 +1,13 @@
 package dao
 
 import (
+	"errors"
+
+	gm "github.com/GoFurry/gofurry-game-backend/apps/game/models"
 	"github.com/GoFurry/gofurry-game-backend/apps/recommend/models"
 	"github.com/GoFurry/gofurry-game-backend/common"
 	"github.com/GoFurry/gofurry-game-backend/common/abstract"
+	"gorm.io/gorm"
 )
 
 var newRecommendDao = new(recommendDao)
@@ -29,5 +33,18 @@ func (dao recommendDao) GetTagList() (res []models.GfgTag, gfError common.GFErro
 	if err := db.Error; err != nil {
 		return res, common.NewDaoError(err.Error())
 	}
+	return res, nil
+}
+
+func (dao recommendDao) GetRecommend(gameIDs []int64, lang string) (res []models.GameTemp, gfError common.GFError) {
+	db := dao.Gm.Table(gm.TableNameGfgGame).Where("id IN ?", gameIDs)
+
+	if err := db.Find(&res).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return res, nil // 未找到对应游戏，返回空
+		}
+		return res, common.NewDaoError("query game info failed: " + err.Error())
+	}
+
 	return res, nil
 }

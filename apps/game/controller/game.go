@@ -104,3 +104,64 @@ func (api *gameApi) GetTagList(c *fiber.Ctx) error {
 
 	return common.NewResponse(c).SuccessWithData(data)
 }
+
+// @Summary 获取游戏的基本信息
+// @Schemes
+// @Description 获取游戏ID对应的基本信息
+// @Tags Game
+// @Accept json
+// @Produce json
+// @Param id query string true "游戏id"
+// @Param lang query string true "语言"
+// @Success 200 {object} []models.GameBaseInfoVo
+// @Router /api/game/info [Get]
+func (api *gameApi) GetGameInfo(c *fiber.Ctx) error {
+	num := c.Query("id", "0")
+	lang := c.Query("lang", "zh")
+	data, err := service.GetGameService().GetGameInfo(num, lang)
+	if err != nil {
+		return common.NewResponse(c).Error(err.GetMsg())
+	}
+
+	return common.NewResponse(c).SuccessWithData(data)
+}
+
+// @Summary 获取游戏的评论
+// @Schemes
+// @Description 获取游戏ID对应的评论
+// @Tags Game
+// @Accept json
+// @Produce json
+// @Param id query string true "游戏id"
+// @Success 200 {object} []models.GameRemarkVo
+// @Router /api/game/remark [Get]
+func (api *gameApi) GetGameRemark(c *fiber.Ctx) error {
+	num := c.Query("id", "0")
+	data, err := service.GetGameService().GetGameRemark(num)
+	if err != nil {
+		return common.NewResponse(c).Error(err.GetMsg())
+	}
+
+	return common.NewResponse(c).SuccessWithData(data)
+}
+
+//// @Summary 获取游戏的简介HTML
+//// @Schemes
+//// @Description 获取游戏的简介HTML
+//// @Tags Game
+//// @Accept json
+//// @Produce json
+//// @Param id query string true "游戏id"
+//// @Param lang query string true "语言"
+//// @Success 200 {object} models.GameIntroVo
+//// @Router /api/game/info/intro [Get]
+//func (api *gameApi) GetGameIntro(c *fiber.Ctx) error {
+//	num := c.Query("id", "0")
+//	lang := c.Query("lang", "zh")
+//	data, err := service.GetGameService().GetGameIntro(num, lang)
+//	if err != nil {
+//		return common.NewResponse(c).Error(err.GetMsg())
+//	}
+//
+//	return common.NewResponse(c).SuccessWithData(data)
+//}

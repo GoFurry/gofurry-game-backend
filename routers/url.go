@@ -15,10 +15,14 @@ import (
  */
 
 func gameApi(g fiber.Router) {
+	g.Get("/info", game.GameApi.GetGameInfo) // 获取单条游戏的基础信息
+	//g.Get("/info/intro", game.GameApi.GetGameIntro)     // 获取游戏内容详情
 	g.Get("/info/list", game.GameApi.GetGameList)       // 获取前 num 条游戏记录
 	g.Get("/info/main", game.GameApi.GetGameMainList)   // 获取首页展示数据
 	g.Get("/panel/main", game.GameApi.GetPanelMainList) // 获取首页面板数据
 	g.Get("/update/latest", game.GameApi.GetUpdateNews) // 获取首页更新公告
+
+	g.Get("/remark", game.GameApi.GetGameRemark) // 获取单条游戏的评论
 
 	g.Get("/tag/list", game.GameApi.GetTagList) // 获取标签列表
 }
@@ -29,7 +33,7 @@ func recommendApi(g fiber.Router) {
 	// 缺点: 需要传入初始物品, 特征值永远为静态, 每次推荐相同
 	// 实现重点: 余弦相似度 特征提取-独热编码
 	g.Get("/game/CBF", recommend.RecommendApi.RecommendByCBF)     // 用 CBF 返回游戏记录
-	g.Get("/game/random", recommend.RecommendApi.GetRandomGameID) // 返回一个随机的游戏记录ID
+	g.Get("/game/random", recommend.RecommendApi.GetRandomGameID) // 返回一个随机的游戏记录 ID
 }
 
 func searchApi(g fiber.Router) {

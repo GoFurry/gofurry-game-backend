@@ -1,8 +1,11 @@
 package models
 
 import (
+	"time"
+
 	rm "github.com/GoFurry/gofurry-game-backend/apps/review/models"
 	cm "github.com/GoFurry/gofurry-game-backend/common/models"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const TableNameGfgGame = "gfg_game"
@@ -61,7 +64,6 @@ type GfgGameRecord struct {
 	Publisher   string `gorm:"column:publisher;type:character varying(100);not null;comment:发行商" json:"publisher"`      // 发行商
 	Info        string `gorm:"column:info;type:text;not null;comment:游戏概述" json:"info"`                                 // 游戏概述
 	Cover       string `gorm:"column:cover;type:character varying(255);comment:封面图" json:"cover"`                       // 封面图
-	HotIndex    int64  `gorm:"column:hot_index;type:bigint;not null;comment:热度指数" json:"hotIndex"`                      // 热度指数
 	Lang        string `gorm:"column:lang;type:character varying(20);not null;comment:记录的语言" json:"lang"`               // 记录的语言
 	PriceList   string `gorm:"column:price_list;type:json;not null;comment:游戏价格列表" json:"priceList"`                    // 游戏价格列表
 	Initial     int64  `gorm:"column:initial;type:bigint;not null;comment:游戏价格" json:"initial"`                         // 游戏价格
@@ -162,4 +164,161 @@ type TagModelVo struct {
 	Name      string `json:"name"`
 	Prefix    string `json:"prefix"`
 	GameCount int    `json:"game_count"`
+}
+
+type GameBaseInfoVo struct {
+	Name       string       `json:"name"`
+	Info       string       `json:"info"`
+	CreateTime cm.LocalTime `json:"create_time"`
+	UpdateTime cm.LocalTime `json:"update_time"`
+	Resources  []struct {
+		cm.KvModel
+	} `json:"resources"`
+	Groups []struct {
+		cm.KvModel
+	} `json:"groups"`
+	ReleaseDate string   `json:"release_date"`
+	Developers  []string `json:"developers"`
+	Publishers  []string `json:"publishers"`
+	Appid       int64    `json:"appid"`
+	Cover       string   `json:"cover"`
+	Links       []struct {
+		cm.KvModel
+	} `json:"links"`
+	Platform            string               `json:"platform"`
+	PriceList           []PriceModel         `json:"price_list"`
+	News                []NewsVo             `json:"news"`
+	Tags                []TagVo              `json:"tags"`
+	Support             SteamAppSupport      `json:"support"`
+	Screenshots         []SteamAppScreenshot `json:"screenshots"`
+	Movies              []SteamAppMovie      `json:"movies"`
+	SupportedLanguages  string               `json:"supported_languages"`
+	RequiredAge         string               `json:"required_age"`
+	Website             string               `json:"website"`
+	DetailedDescription string               `json:"detailed_description"`
+	AboutTheGame        string               `json:"about_the_game"`
+	PcRequirements      PcRequirementModel   `json:"pc_requirements"`
+}
+
+type NewsVo struct {
+	Headline string       `json:"headline"`
+	Content  string       `json:"content"`
+	PostTime cm.LocalTime `json:"post_time"`
+	Author   string       `json:"author"`
+	URL      string       `json:"url"`
+}
+
+type TagVo struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Desc string `json:"desc"`
+}
+
+type GameRemarkVo struct {
+	Total    int           `json:"total"`
+	AvgScore float64       `json:"avg_score"`
+	Remarks  []CommentItem `json:"remarks"`
+}
+
+type CommentItem struct {
+	Region     string       `json:"region"`
+	Content    string       `json:"content"`
+	Score      float64      `json:"score"`
+	CreateTime cm.LocalTime `json:"create_time"`
+	IP         string       `json:"ip"`
+	Name       *string      `json:"name"`
+}
+
+// GameIntro 游戏简介HTML存储模型
+type GameIntro struct {
+	ID         primitive.ObjectID `bson:"_id,omitempty" json:"id"`        // MongoDB自动生成的ID
+	GameID     int64              `bson:"game_id" json:"game_id"`         // 游戏表ID（核心业务标识）
+	Content    string             `bson:"content" json:"content"`         // HTML内容
+	Lang       string             `bson:"lang" json:"lang"`               // 语言
+	CreateTime time.Time          `bson:"create_time" json:"create_time"` // 创建时间
+	UpdateTime time.Time          `bson:"update_time" json:"update_time"` // 更新时间
+}
+
+// TableName 返回集合名
+func (GameIntro) TableName() string {
+	return "game_intro"
+}
+
+type GameIntroVo struct {
+	Content    string       `json:"content"`
+	UpdateTime cm.LocalTime `json:"update_time"`
+}
+
+// ============================= redis 记录
+type SteamAppPrice struct {
+	Initial          int64  `json:"initial"`
+	Final            int64  `json:"final"`
+	Currency         string `json:"currency"`
+	DiscountPercent  int64  `json:"discount_percent"`
+	InitialFormatted string `json:"initial_formatted"`
+	FinalFormatted   string `json:"final_formatted"`
+}
+
+type SteamAppRelease struct {
+	ComingSoon bool   `json:"coming_soon"`
+	Date       string `json:"date"`
+}
+
+type SteamAppPlatform struct {
+	Windows bool `json:"windows"`
+	Mac     bool `json:"mac"`
+	Linux   bool `json:"linux"`
+}
+
+type SteamAppSupport struct {
+	URL   string `json:"url"`
+	Email string `json:"email"`
+}
+
+type SteamAppScreenshot struct {
+	ID            int64  `json:"id"`
+	PathThumbnail string `json:"path_thumbnail"`
+	PathFull      string `json:"path_full"`
+}
+
+type SteamAppMovie struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	Thumbnail string `json:"thumbnail"`
+	DashAv1   string `json:"dash_av1"`
+	DashH264  string `json:"dash_h264"`
+	HlsH264   string `json:"hls_h264"`
+}
+
+type PriceModel struct {
+	Price   string `json:"price"`
+	Country string `json:"country"`
+}
+
+type PcRequirementModel struct {
+	Minimum     string `json:"minimum"`
+	Recommended string `json:"recommended"`
+}
+
+type GameSaveModel struct {
+	Price               SteamAppPrice        `json:"price"`
+	Support             SteamAppSupport      `json:"support"`
+	Screenshots         []SteamAppScreenshot `json:"screenshots"`
+	Movies              []SteamAppMovie      `json:"movies"`
+	PriceList           string               `json:"price_list"`
+	SupportedLanguages  string               `json:"supported_languages"`
+	Developers          string               `json:"developers"`
+	Publishers          string               `json:"publishers"`
+	HeaderImage         string               `json:"header_image"`
+	ShortDescription    string               `json:"short_description"`
+	Date                string               `json:"date"`
+	Platforms           string               `json:"platforms"`
+	RequiredAge         string               `json:"required_age"`
+	Website             string               `json:"website"`
+	ContentDescriptors  string               `json:"content_descriptors"`
+	DetailedDescription string               `json:"detailed_description"`
+	AboutTheGame        string               `json:"about_the_game"`
+	PcRequirements      PcRequirementModel   `json:"pc_requirements"`
+
+	CollectDate cm.LocalTime `json:"collect_date"`
 }

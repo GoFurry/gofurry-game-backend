@@ -1,8 +1,12 @@
 package dao
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/GoFurry/gofurry-game-backend/apps/game/models"
 	gm "github.com/GoFurry/gofurry-game-backend/apps/recommend/models"
+	rm "github.com/GoFurry/gofurry-game-backend/apps/review/models"
 	"github.com/GoFurry/gofurry-game-backend/common"
 	"github.com/GoFurry/gofurry-game-backend/common/abstract"
 	"gorm.io/gorm"
@@ -17,6 +21,98 @@ func init() {
 type gameDao struct{ abstract.Dao }
 
 func GetGameDao() *gameDao { return newGameDao }
+
+func (dao gameDao) GetGame(id int64) (res models.GfgGame, err common.GFError) {
+	db := dao.Gm.Table(models.TableNameGfgGame).Where("id = ?", id)
+	db.Take(&res)
+	if dbErr := db.Error; dbErr != nil {
+		return res, common.NewDaoError(dbErr.Error())
+	}
+	return
+}
+
+func (dao gameDao) GetGameRecord(id int64, lang string) (res models.GfgGameRecord, err common.GFError) {
+	db := dao.Gm.Table(models.TableNameGfgGameRecord).Where("game_id = ? AND lang=?", id, lang)
+	db.Take(&res)
+	if dbErr := db.Error; dbErr != nil {
+		return res, common.NewDaoError(dbErr.Error())
+	}
+	return res, nil
+}
+
+func (dao gameDao) GetGameNews(id int64, lang string) (res []models.GfgGameNews, err common.GFError) {
+	db := dao.Gm.Table(models.TableNameGfgGameNews).Where("game_id = ? AND lang=?", id, lang)
+	db.Order("index ASC")
+	db.Find(&res)
+	if dbErr := db.Error; dbErr != nil {
+		return res, common.NewDaoError(dbErr.Error())
+	}
+	return res, nil
+}
+
+func (dao gameDao) GetGameTags(id int64, lang string) (res []models.TagVo, err common.GFError) {
+	db := dao.Gm.Table("gfg_tag_map tm")
+
+	if lang == "en" {
+		db.Select("t.id::varchar as id, t.name_en as name, t.info_en as desc")
+	} else {
+		db.Select("t.id::varchar as id, t.name as name, t.info as desc")
+	}
+
+	db.Joins("JOIN gfg_tag t ON tm.tag_id = t.id")
+	db.Where("tm.game_id = ?", id)
+	db.Order("t.id ASC")
+
+	if dbErr := db.Find(&res).Error; dbErr != nil {
+		if errors.Is(dbErr, gorm.ErrRecordNotFound) {
+			return []models.TagVo{}, nil
+		}
+		return res, common.NewDaoError(fmt.Sprintf("查询游戏标签失败: %v", dbErr))
+	}
+	return res, nil
+}
+
+func (dao gameDao) GetGameComment(id int64) (res models.GameRemarkVo, err common.GFError) {
+	// 统计
+	statsDb := dao.Gm.Table(rm.TableNameGfgGameComment)
+	var stats struct {
+		Total    int64
+		AvgScore float64
+	}
+
+	statsErr := statsDb.Select(`
+        COUNT(*) AS total, 
+        COALESCE(AVG(score), 0) AS avg_score
+    `).Where("game_id = ?", id).Take(&stats).Error
+
+	if statsErr != nil && !errors.Is(statsErr, gorm.ErrRecordNotFound) {
+		return res, common.NewDaoError(fmt.Sprintf("统计评论数据失败: %v", statsErr))
+	}
+
+	res.Total = int(stats.Total)
+	res.AvgScore = stats.AvgScore
+
+	if stats.Total == 0 {
+		res.Remarks = []models.CommentItem{}
+		return res, nil
+	}
+
+	// 查询评论
+	commentDb := dao.Gm.Table(rm.TableNameGfgGameComment)
+	var remarks []models.CommentItem
+	commentErr := commentDb.Session(&gorm.Session{}).Select(`
+        region, content, score, create_time, ip, name
+    `).Where("game_id = ?", id).
+		Order("create_time DESC").
+		Find(&remarks).Error
+
+	if commentErr != nil {
+		return res, common.NewDaoError(fmt.Sprintf("查询评论列表失败: %v", commentErr))
+	}
+
+	res.Remarks = remarks
+	return res, nil
+}
 
 func (dao gameDao) GetGameList(num int) (res []models.GfgGame, err common.GFError) {
 	db := dao.Gm.Table(models.TableNameGfgGame)

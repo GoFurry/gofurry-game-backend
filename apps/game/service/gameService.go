@@ -155,3 +155,157 @@ func (s gameService) GetUpdateNews() (res models.UpdateNewsVo, err common.GFErro
 func (s gameService) GetTagList(lang string) (res []models.TagModelVo, err common.GFError) {
 	return dao.GetGameDao().GetTagList(lang)
 }
+
+func (s gameService) GetGameInfo(id string, lang string) (res models.GameBaseInfoVo, err common.GFError) {
+	intId, parseErr := util.String2Int64(id)
+	if parseErr != nil {
+		return res, common.NewServiceError("Game ID 转换有误")
+	}
+	game, err := dao.GetGameDao().GetGame(intId)
+	if err != nil {
+		return res, err
+	}
+	// 名字 & 简介
+	switch lang {
+	case "en":
+		res.Name = game.NameEn
+		res.Info = game.InfoEn
+	default:
+		res.Name = game.Name
+		res.Info = game.Info
+	}
+	// 创建时间 & 更新时间
+	res.CreateTime = game.CreateTime
+	res.UpdateTime = game.UpdateTime
+	// 资源 & 社群 & 相关链接
+	if game.Resources != nil {
+		parseErr = sonic.Unmarshal([]byte(*game.Resources), &res.Resources)
+		if parseErr != nil {
+			return res, common.NewServiceError(parseErr.Error())
+		}
+	}
+	if game.Groups != nil {
+		parseErr = sonic.Unmarshal([]byte(*game.Groups), &res.Groups)
+		if parseErr != nil {
+			return res, common.NewServiceError(parseErr.Error())
+		}
+	}
+	if game.Links != nil {
+		parseErr = sonic.Unmarshal([]byte(*game.Links), &res.Links)
+		if parseErr != nil {
+			return res, common.NewServiceError(parseErr.Error())
+		}
+	}
+	// 发售时间 & appid & 封面图
+	res.ReleaseDate = game.ReleaseDate
+	res.Appid = game.Appid
+	res.Cover = game.Header
+	// 发行商 & 开发商
+	var devs, pubs []string
+	parseErr = sonic.Unmarshal([]byte(game.Developers), &devs)
+	if parseErr != nil {
+		return res, common.NewServiceError(parseErr.Error())
+	}
+	parseErr = sonic.Unmarshal([]byte(game.Publishers), &pubs)
+	if parseErr != nil {
+		return res, common.NewServiceError(parseErr.Error())
+	}
+	res.Developers = devs
+	res.Publishers = pubs
+
+	record, err := dao.GetGameDao().GetGameRecord(intId, lang)
+	if err != nil {
+		return res, err
+	}
+	var priceList []models.PriceModel
+	parseErr = sonic.Unmarshal([]byte(record.PriceList), &priceList)
+	if parseErr != nil {
+		return res, common.NewServiceError(parseErr.Error())
+	}
+	res.PriceList = priceList
+
+	news, err := dao.GetGameDao().GetGameNews(intId, lang)
+	if err != nil {
+		return res, err
+	}
+	for _, v := range news {
+		res.News = append(res.News, models.NewsVo{
+			Headline: v.Headline,
+			Content:  v.Content,
+			PostTime: v.PostTime,
+			Author:   v.Author,
+			URL:      v.URL,
+		})
+	}
+
+	tags, err := dao.GetGameDao().GetGameTags(intId, lang)
+	if err != nil {
+		return res, err
+	}
+	res.Tags = tags
+
+	// TODO: 查redis拿截图什么的
+	key := "game:"
+	switch lang {
+	case "en":
+		key += "en"
+	default:
+		key += "zh"
+	}
+	data, err := cs.GetString(key + "-info" + id)
+	if err != nil {
+		return res, err
+	}
+	var gameRecord models.GameSaveModel
+	jsonErr := sonic.Unmarshal([]byte(data), &gameRecord)
+	if jsonErr != nil {
+		return res, common.NewServiceError(jsonErr.Error())
+	}
+	res.SupportedLanguages = gameRecord.SupportedLanguages
+	res.RequiredAge = gameRecord.RequiredAge
+	res.Website = gameRecord.Website
+	res.DetailedDescription = gameRecord.DetailedDescription
+	res.AboutTheGame = gameRecord.AboutTheGame
+	res.PcRequirements = gameRecord.PcRequirements
+	res.Support = gameRecord.Support
+	res.Movies = gameRecord.Movies
+	res.Screenshots = gameRecord.Screenshots
+	res.Platform = gameRecord.Platforms
+
+	return
+}
+
+func (s gameService) GetGameRemark(id string) (res models.GameRemarkVo, err common.GFError) {
+	intId, parseErr := util.String2Int64(id)
+	if parseErr != nil {
+		return res, common.NewServiceError("Game ID 转换有误")
+	}
+	res, err = dao.GetGameDao().GetGameComment(intId)
+	if err != nil {
+		return res, err
+	}
+
+	// 脱敏 IP
+	for i := range res.Remarks {
+		res.Remarks[i].IP = util.DesensitizeIP(res.Remarks[i].IP)
+	}
+	return
+}
+
+//func (s gameService) GetGameIntro(id string, lang string) (res models.GameIntroVo, err common.GFError) {
+//	intId, parseErr := util.String2Int64(id)
+//	if parseErr != nil {
+//		return res, common.NewServiceError("Game ID 转换有误")
+//	}
+//	introRecord, err := dao.NewGameIntroDao().GetByGameIDAndLang(context.Background(), intId, lang)
+//	if err != nil {
+//		return res, err
+//	}
+//	res.Content = introRecord.Content
+//	if !introRecord.UpdateTime.IsZero() {
+//		res.UpdateTime = cm.LocalTime(introRecord.UpdateTime)
+//	} else {
+//		res.UpdateTime = cm.LocalTime{}
+//	}
+//	return
+//}

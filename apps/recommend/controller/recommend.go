@@ -39,7 +39,7 @@ func (api *recommendApi) GetRandomGameID(c *fiber.Ctx) error {
 // @Produce json
 // @Param id query string true "初始id"
 // @Param lang query string true "语言"
-// @Success 200 {object} common.ResultData
+// @Success 200 {object} []models.GameRecommendVo
 // @Router /api/recommend/game/CBF [Get]
 func (api *recommendApi) RecommendByCBF(c *fiber.Ctx) error {
 	id := c.Query("id", "-1")
