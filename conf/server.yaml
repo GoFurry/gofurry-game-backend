@@ -24,6 +24,15 @@ redis:
   redis_addr: "192.168.153.121:6379" # redis ip
   redis_password: "123456" # redis 密码
 
+# mongodb
+mongodb:
+  username: "mongodb"
+  password: "123456"
+  host: "192.168.153.121"
+  port: "7017"
+  auth_db: "admin"
+  db_name: "gfg" # 默认数据库名称
+
 # kafka
 #kafka:
 #  kafka_user: "" # kafka 用户名
