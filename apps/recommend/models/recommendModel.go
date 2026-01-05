@@ -53,3 +53,20 @@ func (a BySimilarity) Swap(i, j int) {
 	a[i], a[j] = a[j], a[i]
 }
 func (a BySimilarity) Less(i, j int) bool { return a[i].Similarity > a[j].Similarity }
+
+type GameRecommendVo struct {
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	Info       string  `json:"info"`
+	Similarity float64 `json:"similarity"`
+	Appid      string  `json:"appid"`
+}
+
+type GameTemp struct {
+	ID     int64  `gorm:"column:id"`
+	NameZh string `gorm:"column:name"`
+	NameEn string `gorm:"column:name_en"`
+	InfoZh string `gorm:"column:info"`
+	InfoEn string `gorm:"column:info_en"`
+	Appid  string `gorm:"column:appid"`
+}

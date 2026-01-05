@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
@@ -15,6 +16,7 @@ import (
 	cs "github.com/GoFurry/gofurry-game-backend/common/service"
 	"github.com/GoFurry/gofurry-game-backend/common/util"
 	"github.com/bytedance/sonic"
+	"golang.org/x/sync/errgroup"
 
 	gd "github.com/GoFurry/gofurry-game-backend/apps/game/dao"
 	gm "github.com/GoFurry/gofurry-game-backend/apps/game/models"
@@ -32,6 +34,16 @@ const (
 	redisTagIDsKey     = "recommend:tag-ids"
 	cacheExpireTime    = 1 * time.Hour // 缓存过期时间
 )
+
+const (
+	// 推荐计算的超时时间
+	recommendCalcTimeout = 3 * time.Second
+	// 任务池大小
+	calcPoolSize = 4
+)
+
+// 任务池, 限制并发计算任务数
+var calcPool = make(chan struct{}, calcPoolSize)
 
 var once sync.Once
 
@@ -58,27 +70,85 @@ func (s recommendService) GetRandomGameID() (string, common.GFError) {
 	return util.Int642String(gameRecord.ID), nil
 }
 
-// Content-based Filter 返回物品A的余弦相似度最高的物品
-func (s recommendService) RecommendByCBF(id string, lang string) (gameListVo []gm.GameRespVo, err common.GFError) {
+// RecommendByCBF Content-based Filter 返回物品A的余弦相似度最高的物品
+func (s recommendService) RecommendByCBF(id string, lang string) (gameListVo []models.GameRecommendVo, err common.GFError) {
 	intID, parseErr := util.String2Int64(id)
 	if parseErr != nil {
 		return nil, common.NewServiceError(parseErr.Error())
 	}
-	if gameListVo, err = getGameCBF(intID, lang); err != nil {
-		return nil, err
+
+	// 创建根上下文
+	rootCtx, rootCancel := context.WithTimeout(context.Background(), recommendCalcTimeout)
+	defer rootCancel()
+
+	// 用 errgroup 管理异步任务
+	g, ctx := errgroup.WithContext(rootCtx)
+	resultChan := make(chan []models.GameRecommendVo, 1)
+	errChan := make(chan common.GFError, 1)
+
+	// 异步执行计算任务
+	g.Go(func() error {
+		select {
+		case calcPool <- struct{}{}: // 获取令牌
+			defer func() {
+				<-calcPool // 释放令牌
+			}()
+		case <-ctx.Done(): // 超时/取消时
+			return ctx.Err()
+		}
+
+		// 执行计算密集型任务
+		select {
+		case <-ctx.Done(): // 任务还没开始就超时
+			return ctx.Err()
+		default:
+			res, e := getGameCBF(intID, lang)
+
+			if e != nil {
+				errChan <- e
+				return fmt.Errorf("计算推荐失败: %s", e.GetMsg())
+			}
+			resultChan <- res
+			return nil
+		}
+	})
+
+	// 等待任务完成
+	waitErr := g.Wait()
+	// 先判断是否是根上下文超时
+	if rootCtx.Err() == context.DeadlineExceeded {
+		return nil, common.NewServiceError(fmt.Sprintf("推荐计算超时(超时时间: %v)", recommendCalcTimeout))
 	}
-	return
+
+	// 处理其他错误
+	if waitErr != nil {
+		log.Error("推荐请求执行失败: id=%s, err=%v", id, waitErr)
+		select {
+		case e := <-errChan:
+			return nil, e
+		default:
+			return nil, common.NewServiceError("推荐计算失败: " + waitErr.Error())
+		}
+	}
+
+	// 读取结果时增加超时兜底
+	select {
+	case res := <-resultChan:
+		return res, nil
+	case e := <-errChan:
+		return nil, e
+	case <-rootCtx.Done():
+		return nil, common.NewServiceError("推荐计算超时")
+	}
 }
 
 // CBF 获取一组推荐的游戏记录
-func getGameCBF(id int64, lang string) (recommendContent []gm.GameRespVo, err common.GFError) {
+func getGameCBF(id int64, lang string) (recommendContent []models.GameRecommendVo, err common.GFError) {
 	// 执行 CBF
-	start := time.Now()
 	similarities, err := processContentBasedFilter(id)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(time.Since(start))
 
 	// 从相似度结果生成推荐视图 前12随机选8
 	const topN = 8
@@ -96,28 +166,64 @@ func getGameCBF(id int64, lang string) (recommendContent []gm.GameRespVo, err co
 	}
 
 	// 打乱候选列表 增加多样性
-	rand.Shuffle(len(filtered), func(i, j int) {
-		filtered[i], filtered[j] = filtered[j], filtered[i]
-	})
+	//rand.Shuffle(len(filtered), func(i, j int) {
+	//	filtered[i], filtered[j] = filtered[j], filtered[i]
+	//})
 	if len(filtered) > topN {
 		filtered = filtered[:topN]
 	}
 
-	// 转换为GameRespVo
-	// TODO:暂不修改
+	// 转换为 GameRecommendVo
+	if len(filtered) == 0 {
+		return recommendContent, nil
+	}
+
+	var gameIDs []int64
+	idToSimilarity := make(map[int64]float64)
+	for _, item := range filtered {
+		gameIDs = append(gameIDs, item.ID)
+		idToSimilarity[item.ID] = item.Similarity
+	}
+	gameList, err := dao.GetRecommendDao().GetRecommend(gameIDs, lang)
+	if err != nil {
+		return nil, common.NewServiceError(err.GetMsg())
+	}
+
+	for _, game := range gameList {
+		vo := models.GameRecommendVo{
+			ID:         util.Int642String(game.ID),
+			Similarity: idToSimilarity[game.ID],
+			Appid:      game.Appid,
+		}
+
+		if lang == "en" {
+			vo.Name = game.NameEn
+			vo.Info = game.InfoEn
+		} else {
+			vo.Name = game.NameZh
+			vo.Info = game.InfoZh
+		}
+
+		recommendContent = append(recommendContent, vo)
+	}
+
+	// 排序
+	sort.Slice(recommendContent, func(i, j int) bool {
+		return recommendContent[i].Similarity > recommendContent[j].Similarity
+	})
 
 	return recommendContent, nil
 }
 
 // CBF 算法
 func processContentBasedFilter(gameID int64) ([]models.ContentSimilarities, common.GFError) {
-	// 获取标签映射和标签ID列表
+	// 获取标签映射和标签 ID 列表
 	tagMappingMap, tagIDs, err := getTagToMap()
 	if err != nil {
 		return nil, err
 	}
 
-	// 初始化标签ID到维度索引的映射
+	// 初始化标签 ID 到维度索引的映射
 	tagIDToIndex := buildTagIndexMap(tagIDs)
 
 	// 特征提取 - 独热编码
@@ -125,7 +231,7 @@ func processContentBasedFilter(gameID int64) ([]models.ContentSimilarities, comm
 
 	// 校验目标游戏是否存在有效特征
 	if len(targetContent.Tag) == 0 {
-		// 游戏ID不在映射中
+		// 游戏 ID 不在映射中
 		if _, exists := tagMappingMap[gameID]; !exists {
 			return nil, common.NewServiceError("目标游戏不存在或未关联标签")
 		}
