@@ -1,169 +1,292 @@
 package log
 
-/*
- * @Desc: 日志服务
- * @author: 福狼
- * @version: v1.0.0
- */
-
 import (
-	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
-	"strings"
+	"time"
 
-	"github.com/GoFurry/gofurry-game-backend/roof/env"
-	"github.com/bytedance/sonic"
-	"github.com/sirupsen/logrus"
+	"github.com/GoFurry/gofurry-game-backend/common"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-var logName = env.GetServerConfig().Log.LogPath
-var logger = logrus.New()
+/*
+ * @Desc: 日志 Zap封装
+ * @author: 福狼
+ * @version: v1.0.1
+ */
 
-const sFunctionName = "s-FunctionName"
-const sFunctionLine = "s-FunctionLine"
-const sFunctionEvent = "s-Event"
+// 全局日志实例
+var (
+	GlobalLogger *zap.Logger
+	SugarLogger  *zap.SugaredLogger
+)
 
-func init() {
-
-	//writer, err := rotatelogs.New(
-	//	logName+".%Y%m%d.log",
-	//	rotatelogs.WithLinkName(logName),
-	//	rotatelogs.WithRotationTime(24*time.Hour),
-	//	rotatelogs.WithRotationCount(uint(env.GetServerConfig().Log.LogRotationCount)),
-	//	//rotatelogs.WithMaxAge(time.Hour*24),
-	//)
-	//if err != nil {
-	//	logger.Errorf("config local file business for logger error: %v", err)
-	//} else {
-	//	lfHook := lfshook.NewHook(lfshook.WriterMap{
-	//		logrus.DebugLevel: writer,
-	//		logrus.InfoLevel:  writer,
-	//		logrus.WarnLevel:  writer,
-	//		logrus.ErrorLevel: writer,
-	//		logrus.FatalLevel: writer,
-	//		logrus.PanicLevel: writer,
-	//	}, // 分割日志样式
-	//		//&logrus.TextFormatter{
-	//		//	TimestampFormat: common.TIME_FORMAT_DATE,
-	//		//	DisableColors: true,
-	//		//	FullTimestamp: true,
-	//		//	DisableSorting: true,
-	//		//}
-	//		&LoggerFormatter{},
-	//	)
-	//	logger.SetFormatter(&LoggerFormatter{})
-	//	logger.AddHook(lfHook)
-	//	logLevel := strings.ToLower(env.GetServerConfig().Log.LogLevel)
-	//	switch logLevel {
-	//	case "info":
-	//		logger.SetLevel(logrus.InfoLevel)
-	//	case "debug":
-	//		logger.SetLevel(logrus.DebugLevel)
-	//	case "warn":
-	//		logger.SetLevel(logrus.WarnLevel)
-	//	case "error":
-	//		logger.SetLevel(logrus.ErrorLevel)
-	//	}
-	//}
+// Config 日志配置结构体
+type Config struct {
+	Level      string // 日志级别 debug/info/warn/error/dpanic/panic/fatal
+	Mode       string // 运行模式 dev(控制台)/prod(文件)
+	FilePath   string // 日志文件路径(prod必填)
+	MaxSize    int    // 单个日志文件大小(MB)
+	MaxBackups int    // 最大备份数
+	MaxAge     int    // 最大保留天数
+	Compress   bool   // 是否压缩备份
+	ShowLine   bool   // 是否显示代码行号
+	EncodeJson bool   // 是否 JSON 格式输出
+	TimeFormat string // 时间格式
+	CallerSkip int    // 调用栈跳过层数
 }
 
-type LoggerFormatter struct {
+// defaultConfig 获取默认日志配置
+func defaultConfig() Config {
+	return Config{
+		Level:      "info",
+		Mode:       "dev",
+		FilePath:   "./logs/gf-steam-sdk.log",
+		MaxSize:    100,
+		MaxBackups: 7,
+		MaxAge:     30,
+		Compress:   true,
+		ShowLine:   true,
+		EncodeJson: false,
+		TimeFormat: common.TIME_FORMAT_DATE,
+		CallerSkip: 1,
+	}
 }
 
-func (l *LoggerFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	b := &bytes.Buffer{}
-	if entry.Buffer != nil {
-		b = entry.Buffer
+// InitLogger 初始化日志
+func InitLogger(cfg *Config) error {
+	// 合并默认配置
+	defaultCfg := defaultConfig()
+	if cfg == nil {
+		cfg = &defaultCfg
 	} else {
-		b = &bytes.Buffer{}
-	}
-	timestamp := entry.Time.Format("2005-01-02 15:04:05:05.999")
-	funcName := entry.Data[sFunctionName]
-	if funcName == nil {
-		funcName = "F"
-	}
-	funcLine := entry.Data[sFunctionLine]
-	if funcLine == nil {
-		funcLine = 0
-	}
-	funcEvent := entry.Data[sFunctionEvent]
-	if funcEvent == nil {
-		funcEvent = env.GetServerConfig().Server.AppName
-	}
-	targetMap := make(map[string]any)
-	for key, value := range entry.Data {
-		if key == sFunctionName || key == sFunctionLine || key == sFunctionEvent {
-			continue
+		if cfg.Level == "" {
+			cfg.Level = defaultCfg.Level
 		}
-		targetMap[key] = value
+		if cfg.Mode == "" {
+			cfg.Mode = defaultCfg.Mode
+		}
+		if cfg.FilePath == "" {
+			cfg.FilePath = defaultCfg.FilePath
+		}
+		if cfg.MaxSize == 0 {
+			cfg.MaxSize = defaultCfg.MaxSize
+		}
+		if cfg.MaxBackups == 0 {
+			cfg.MaxBackups = defaultCfg.MaxBackups
+		}
+		if cfg.MaxAge == 0 {
+			cfg.MaxAge = defaultCfg.MaxAge
+		}
+		if cfg.TimeFormat == "" {
+			cfg.TimeFormat = defaultCfg.TimeFormat
+		}
+		if cfg.CallerSkip == 0 {
+			cfg.CallerSkip = defaultCfg.CallerSkip
+		}
 	}
-	newLog := ""
-	dataInfo := ""
-	if len(targetMap) > 0 {
-		dataJson, _ := sonic.Marshal(targetMap)
-		dataInfo = string(dataJson)
+
+	// 验证生产模式配置
+	if cfg.Mode == "prod" && cfg.FilePath == "" {
+		return fmt.Errorf("生产模式必须配置文件路径")
 	}
-	msg := entry.Message
-	if len(msg) > env.GetServerConfig().Log.LogChokeLength {
-		msg = msg[0:env.GetServerConfig().Log.LogChokeLength] + "...节流"
+
+	// 设置日志级别
+	level := zapcore.InfoLevel
+	if err := level.UnmarshalText([]byte(cfg.Level)); err != nil {
+		return err
 	}
-	newLog = fmt.Sprintf("[%s] [%s] [%s -> %d] [%s -> %s] %s\n",
-		funcEvent, timestamp, funcName, funcLine, entry.Level, msg, dataInfo)
-	b.WriteString(newLog)
-	return b.Bytes(), nil
+
+	// 配置编码器
+	encoderConfig := zapcore.EncoderConfig{
+		TimeKey:        "time",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		CallerKey:      "caller",
+		MessageKey:     "msg",
+		StacktraceKey:  "stacktrace",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    zapcore.CapitalLevelEncoder,
+		EncodeTime:     customTimeEncoder(cfg.TimeFormat),
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+		EncodeCaller:   zapcore.ShortCallerEncoder,
+	}
+
+	// 配置输出
+	var writeSyncer zapcore.WriteSyncer
+	if cfg.Mode == "prod" {
+		// 创建日志目录
+		dir := filepath.Dir(cfg.FilePath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+
+		// 生产模式: 输出到文件
+		lumberjackLogger := &lumberjack.Logger{
+			Filename:   cfg.FilePath,
+			MaxSize:    cfg.MaxSize,
+			MaxBackups: cfg.MaxBackups,
+			MaxAge:     cfg.MaxAge,
+			Compress:   cfg.Compress,
+			LocalTime:  true, // 使用本地时间命名备份文件
+		}
+		writeSyncer = zapcore.AddSync(lumberjackLogger)
+		// 生产模式默认 JSON 格式
+		if !cfg.EncodeJson {
+			cfg.EncodeJson = true
+		}
+	} else {
+		// 开发模式输出到控制台
+		writeSyncer = zapcore.AddSync(os.Stdout)
+	}
+
+	// 选择编码器
+	var encoder zapcore.Encoder
+	if cfg.EncodeJson {
+		encoder = zapcore.NewJSONEncoder(encoderConfig)
+	} else {
+		encoder = zapcore.NewConsoleEncoder(encoderConfig)
+	}
+
+	// 构建 Logger 核心
+	core := zapcore.NewCore(encoder, writeSyncer, level)
+
+	// 配置选项
+	options := []zap.Option{}
+	if cfg.ShowLine {
+		options = append(options,
+			zap.AddCaller(),
+			zap.AddCallerSkip(cfg.CallerSkip), // 跳过封装函数
+			zap.AddStacktrace(zapcore.ErrorLevel),
+		)
+	}
+
+	// 初始化全局 Logger
+	GlobalLogger = zap.New(core, options...)
+	SugarLogger = GlobalLogger.Sugar()
+
+	// 测试日志
+	GlobalLogger.Info("gofurry logger init success",
+		String("mode", cfg.Mode),
+		String("level", cfg.Level),
+	)
+
+	// 程序退出时自动刷写日志
+	runtime.SetFinalizer(&GlobalLogger, func(l **zap.Logger) {
+		_ = (*l).Sync()
+	})
+
+	return nil
 }
 
-func WithFieldsMsg(fields map[string]interface{}, msg interface{}) {
-	line, functionName := 0, "???"
-	pc, _, line, ok := runtime.Caller(1)
-	if ok {
-		functionName = runtime.FuncForPC(pc).Name()
+// customTimeEncoder 自定义时间编码器
+func customTimeEncoder(timeFormat string) zapcore.TimeEncoder {
+	return func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+		enc.AppendString(t.Format(timeFormat))
 	}
-	fields[sFunctionName] = functionName
-	fields[sFunctionLine] = line
-	logger.WithFields(fields).Info(msg)
 }
 
-func buildCallerFields(functionName string, line int, event string) logrus.Fields {
-	if strings.TrimSpace(event) == "" {
-		event = env.GetServerConfig().Server.AppName
+// Sync 刷写日志缓冲区
+func Sync() error {
+	if GlobalLogger != nil {
+		return GlobalLogger.Sync()
 	}
-	return logrus.Fields{sFunctionName: functionName, sFunctionLine: line, sFunctionEvent: event}
+	return nil
 }
 
-func Error(msg ...interface{}) {
-	line, functionName := 0, "???"
-	pc, _, line, ok := runtime.Caller(1)
-	if ok {
-		functionName = runtime.FuncForPC(pc).Name()
-	}
-	logger.WithFields(buildCallerFields(functionName, line, "")).Error(msg)
+// ============================ 扩展结构化字段 ============================
+func String(key, value string) zap.Field {
+	return zap.String(key, value)
 }
 
-func Debug(msg ...interface{}) {
-	line, functionName := 0, "???"
-	pc, _, line, ok := runtime.Caller(1)
-	if ok {
-		functionName = runtime.FuncForPC(pc).Name()
-	}
-	logger.WithFields(buildCallerFields(functionName, line, "")).Debug(msg)
+func Int(key string, value int) zap.Field {
+	return zap.Int(key, value)
 }
 
-func Warn(msg ...interface{}) {
-	line, functionName := 0, "???"
-	pc, _, line, ok := runtime.Caller(1)
-	if ok {
-		functionName = runtime.FuncForPC(pc).Name()
-	}
-	logger.WithFields(buildCallerFields(functionName, line, "")).Warn(msg)
+func Uint64(key string, value uint64) zap.Field {
+	return zap.Uint64(key, value)
 }
 
-func Info(msg ...interface{}) {
-	line, functionName := 0, "???"
-	pc, _, line, ok := runtime.Caller(1)
-	if ok {
-		functionName = runtime.FuncForPC(pc).Name()
-	}
-	logger.WithFields(buildCallerFields(functionName, line, "")).Info(msg)
+func Duration(key string, value time.Duration) zap.Field {
+	return zap.Duration(key, value)
+}
+
+// 新增常用字段类型
+func Bool(key string, value bool) zap.Field {
+	return zap.Bool(key, value)
+}
+
+func Float64(key string, value float64) zap.Field {
+	return zap.Float64(key, value)
+}
+
+func Any(key string, value interface{}) zap.Field {
+	return zap.Any(key, value)
+}
+
+// ============================ 日志调用方法 ============================
+func Debug(args ...interface{}) {
+	SugarLogger.Debug(args...)
+}
+
+func Info(args ...interface{}) {
+	SugarLogger.Info(args...)
+}
+
+func Warn(args ...interface{}) {
+	SugarLogger.Warn(args...)
+}
+
+func Error(args ...interface{}) {
+	SugarLogger.Error(args...)
+}
+
+func Fatal(args ...interface{}) {
+	SugarLogger.Fatal(args...)
+}
+
+// ============================ 格式化日志 ============================
+func Debugf(template string, args ...interface{}) {
+	SugarLogger.Debugf(template, args...)
+}
+
+func Infof(template string, args ...interface{}) {
+	SugarLogger.Infof(template, args...)
+}
+
+func Warnf(template string, args ...interface{}) {
+	SugarLogger.Warnf(template, args...)
+}
+
+func Errorf(template string, args ...interface{}) {
+	SugarLogger.Errorf(template, args...)
+}
+
+func Fatalf(template string, args ...interface{}) {
+	SugarLogger.Fatalf(template, args...)
+}
+
+// ============================ 带字段的结构化日志 ============================
+func DebugWithFields(msg string, fields ...zap.Field) {
+	GlobalLogger.Debug(msg, fields...)
+}
+
+func InfoWithFields(msg string, fields ...zap.Field) {
+	GlobalLogger.Info(msg, fields...)
+}
+
+func WarnWithFields(msg string, fields ...zap.Field) {
+	GlobalLogger.Warn(msg, fields...)
+}
+
+func ErrorWithFields(msg string, fields ...zap.Field) {
+	GlobalLogger.Error(msg, fields...)
+}
+
+func FatalWithFields(msg string, fields ...zap.Field) {
+	GlobalLogger.Fatal(msg, fields...)
 }
