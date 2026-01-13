@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/GoFurry/gofurry-game-backend/common"
 	"gopkg.in/yaml.v2"
@@ -23,15 +24,19 @@ type serverConfig struct {
 	Log        LogConfig        `yaml:"log"`
 	Redis      RedisConfig      `yaml:"redis"`
 	Mongodb    MongodbConfig    `yaml:"mongodb"`
-	Email      EmailConfig      `yaml:"email"`
 	Thread     ThreadConfig     `yaml:"thread"`
-	Github     GithubConfig     `yaml:"github"`
-	Gitee      GiteeConfig      `yaml:"gitee"`
 	Middleware MiddlewareConfig `yaml:"middleware"`
 	Waf        WafConfig        `yaml:"waf"`
 	Proxy      ProxyConfig      `yaml:"proxy"`
 	Resource   ResourceConfig   `yaml:"resource"`
 	Auth       AuthConfig       `yaml:"auth"`
+	Prometheus PrometheusConfig `yaml:"prometheus"`
+}
+
+type PrometheusConfig struct {
+	Url      string `yaml:"url"`
+	AuthName string `yaml:"auth_name"`
+	AuthPass string `yaml:"auth_pass"`
 }
 
 type MongodbConfig struct {
@@ -49,10 +54,7 @@ type AuthConfig struct {
 }
 
 type ResourceConfig struct {
-	ImagePath       string `yaml:"bg_image_path"`
-	ResizeImagePath string `yaml:"bg_resize_image_path"`
-	ImageExts       string `yaml:"image_exts"`
-	Geolite2Path    string `yaml:"geolite2_path"`
+	Geolite2Path string `yaml:"geolite2_path"`
 }
 
 type ProxyConfig struct {
@@ -61,12 +63,20 @@ type ProxyConfig struct {
 
 type WafConfig struct {
 	ConfPath  string `yaml:"conf_path"`
-	WafSwitch string `yaml:"waf_switch"`
+	WafSwitch bool   `yaml:"waf_switch"`
 }
 
 type MiddlewareConfig struct {
 	Swagger SwaggerConfig `yaml:"swagger"`
 	Cors    CorsConfig    `yaml:"cors"`
+	Limiter LimiterConfig `yaml:"limiter"`
+}
+
+// LimiterConfig 限流器配置
+type LimiterConfig struct {
+	IsOn        bool          `yaml:"is_on"`
+	MaxRequests int           `yaml:"max_requests"`
+	Expiration  time.Duration `yaml:"expiration"`
 }
 
 type CorsConfig struct {
@@ -74,23 +84,11 @@ type CorsConfig struct {
 }
 
 type SwaggerConfig struct {
-	IsOn     string `yaml:"is_on"`
+	IsOn     bool   `yaml:"is_on"`
 	FilePath string `yaml:"file_path"`
 	BasePath string `yaml:"base_path"`
 	Path     string `yaml:"path"`
 	Title    string `yaml:"title"`
-}
-
-type GithubConfig struct {
-	ClientId     string `yaml:"client_id"`
-	ClientSecret string `yaml:"client_secret"`
-	RedirectUrl  string `yaml:"redirect_url"`
-}
-
-type GiteeConfig struct {
-	ClientId     string `yaml:"client_id"`
-	ClientSecret string `yaml:"client_secret"`
-	RedirectUrl  string `yaml:"redirect_url"`
 }
 
 type ThreadConfig struct {
@@ -100,23 +98,18 @@ type ThreadConfig struct {
 	EventPublishThread    int `yaml:"event_publish_thread"`
 }
 
-type EmailConfig struct {
-	EmailHost     string `yaml:"email_host"`
-	EmailPort     int    `yaml:"email_port"`
-	EmailUser     string `yaml:"email_user"`
-	EmailPassword string `yaml:"email_password"`
-}
-
 type RedisConfig struct {
 	RedisAddr     string `yaml:"redis_addr"`
 	RedisPassword string `yaml:"redis_password"`
 }
 
 type LogConfig struct {
-	LogRotationCount int    `yaml:"log_rotation_count"`
-	LogPath          string `yaml:"log_path"`
-	LogLevel         string `yaml:"log_level"`
-	LogChokeLength   int    `yaml:"log_choke_length"`
+	LogLevel      string `yaml:"log_level"`
+	LogMode       string `yaml:"log_mode"`
+	LogPath       string `yaml:"log_path"`
+	LogMaxSize    int    `yaml:"log_max_size"`
+	LogMaxBackups int    `yaml:"log_max_backups"`
+	LogMaxAge     int    `yaml:"log_max_age"`
 }
 
 type DataBaseConfig struct {
@@ -128,12 +121,15 @@ type DataBaseConfig struct {
 }
 
 type ServerConfig struct {
-	AppName     string `yaml:"app_name"`
-	AppVersion  string `yaml:"app_version"`
-	Mode        string `yaml:"models"`
-	IPAddress   string `yaml:"ip_address"`
-	Port        string `yaml:"port"`
-	MemoryLimit int    `yaml:"memory_limit"`
+	AppName       string `yaml:"app_name"`
+	AppVersion    string `yaml:"app_version"`
+	Mode          string `yaml:"mode"`
+	IPAddress     string `yaml:"ip_address"`
+	Port          string `yaml:"port"`
+	MemoryLimit   int    `yaml:"memory_limit"`
+	GCPercent     int    `yaml:"gc_percent"`
+	Network       string `yaml:"network"`
+	EnablePrefork bool   `yaml:"enable_prefork"`
 }
 
 type KeyConfig struct {
