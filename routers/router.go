@@ -7,7 +7,9 @@ package routers
  */
 
 import (
+	"os"
 	"sync"
+	"time"
 
 	"github.com/GoFurry/gofurry-game-backend/common"
 	"github.com/GoFurry/gofurry-game-backend/middleware"
@@ -15,6 +17,7 @@ import (
 	"github.com/gofiber/contrib/swagger"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/pprof"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 )
@@ -37,57 +40,22 @@ func (router *router) Init() *fiber.App {
 	once.Do(func() {
 	})
 
+	cfg := env.GetServerConfig()
+
 	app := fiber.New(fiber.Config{
-		// 使用 ipv6 不用 NAT 速度更快, 降低被扫地址的可能性
-		Network:      fiber.NetworkTCP6, // tcp tcp4 tcp6 三种模式
-		AppName:      common.COMMON_PROJECT_NAME,
-		ServerHeader: "GoFurry-Game",
-		Prefork:      false, // 多核cpu处理高并发 业务量小需关闭
-		// 在生产环境禁用错误堆栈跟踪
-		EnablePrintRoutes: env.GetServerConfig().Server.Mode == "debug",
-		// 配置默认404处理
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
-			// 检查是否是404错误
-			if err == fiber.ErrNotFound {
-				return common.NewResponse(c).Error("链接不存在")
-			}
-			// 检查是否是405错误
-			if err == fiber.ErrMethodNotAllowed {
-				return common.NewResponse(c).Error("方法不存在")
-			}
-			// 其他错误
-			return common.NewResponse(c).Error(err.Error())
-		},
-		EnableTrustedProxyCheck: true, // 信任 Nginx 反向代理
+		Network:                 cfg.Server.Network, // tcp tcp4 tcp6 三种模式
+		AppName:                 common.COMMON_PROJECT_NAME,
+		ServerHeader:            "GoFurry-Nav",
+		Prefork:                 cfg.Server.EnablePrefork,   // 多核cpu处理计算密集型任务 业务量小、IO密集型需关闭
+		EnablePrintRoutes:       cfg.Server.Mode == "debug", // 在生产环境禁用错误堆栈跟踪
+		ErrorHandler:            customErrorHandler,         // 统一错误处理
+		EnableTrustedProxyCheck: true,                       // 信任 Nginx 反向代理
+		ReadTimeout:             5 * time.Second,
+		WriteTimeout:            10 * time.Second,
 	})
 
-	cfg := swagger.Config{
-		BasePath: env.GetServerConfig().Middleware.Swagger.BasePath,
-		FilePath: env.GetServerConfig().Middleware.Swagger.FilePath,
-		Path:     env.GetServerConfig().Middleware.Swagger.Path,
-		Title:    env.GetServerConfig().Middleware.Swagger.Title,
-	}
-	// 中间件
-	if env.GetServerConfig().Middleware.Swagger.IsOn == "on" {
-		app.Use(swagger.New(cfg)) // 访问路径类似 https://[::1]:9999/swagger
-	}
-	// 调试模式下启用pprof
-	if env.GetServerConfig().Server.Mode == "debug" {
-		app.Use(pprof.New())
-	}
-	// 跨域
-	app.Use(cors.New())
-	//app.Use(cors.New(cors.Config{
-	//	AllowOrigins:     env.GetServerConfig().Middleware.Cors.AllowOrigins,
-	//	AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
-	//	AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
-	//	AllowCredentials: true,
-	//}))
-	// 恢复
-	app.Use(recover.New())
-	if env.GetServerConfig().Waf.WafSwitch == "on" {
-		app.Use(middleware.CorazaMiddleware()) // CorazaWAF
-	}
+	// 注册全局中间件
+	registerMiddlewares(app)
 
 	// 路由分组
 	gameApi(app.Group("/api/game"))
@@ -100,4 +68,101 @@ func (router *router) Init() *fiber.App {
 	})
 
 	return app
+}
+
+// registerMiddlewares 注册中间件
+func registerMiddlewares(app *fiber.App) {
+	cfg := env.GetServerConfig()
+	// 恢复 panic
+	app.Use(recover.New(recover.Config{
+		EnableStackTrace: cfg.Server.Mode == "debug", // 仅调试模式打印堆栈
+	}))
+
+	// 跨域中间件
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     cfg.Middleware.Cors.AllowOrigins,
+		AllowMethods:     "GET,POST,PUT,DELETE,PATCH,OPTIONS",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Requested-With",
+		AllowCredentials: true,
+		ExposeHeaders:    "Content-Length",
+		MaxAge:           86400, // 预检请求缓存 24 小时
+	}))
+
+	// 请求限流
+	if cfg.Middleware.Limiter.IsOn {
+		app.Use(limiter.New(limiter.Config{
+			Max:        cfg.Middleware.Limiter.MaxRequests,              // 单位时间最大请求数
+			Expiration: cfg.Middleware.Limiter.Expiration * time.Second, // 时间窗口
+			KeyGenerator: func(c *fiber.Ctx) string {
+				return c.IP() // 按 IP 限流
+			},
+			LimitReached: func(c *fiber.Ctx) error {
+				return common.NewResponse(c).ErrorWithCode("请求过于频繁, 请稍后再试", fiber.StatusTooManyRequests)
+			},
+		}))
+	}
+
+	// WAF 中间件
+	if cfg.Waf.WafSwitch {
+		app.Use(middleware.CorazaMiddleware())
+	}
+
+	// 调试模式专属
+	if cfg.Server.Mode == "debug" {
+		// pprof 性能分析
+		app.Use(pprof.New())
+
+		// Swagger 文档
+		if cfg.Middleware.Swagger.IsOn {
+			// 校验 Swagger 文件是否存在
+			if _, err := os.Stat(cfg.Middleware.Swagger.FilePath); os.IsNotExist(err) {
+				panic("Swagger 文件不存在: " + cfg.Middleware.Swagger.FilePath)
+			}
+			swaggerCfg := swagger.Config{
+				BasePath: cfg.Middleware.Swagger.BasePath,
+				FilePath: cfg.Middleware.Swagger.FilePath,
+				Path:     cfg.Middleware.Swagger.Path,
+				Title:    cfg.Middleware.Swagger.Title,
+			}
+			app.Use(swagger.New(swaggerCfg))
+		}
+	}
+
+	// Prometheus
+	app.Use(middleware.PrometheusMiddleware)
+	app.Get("/metrics", middleware.MetricsHandler)
+
+	// IP地理位置统计 本地GeoIP + API接入 跳过/metrics
+	app.Use(func(c *fiber.Ctx) error {
+		if c.Path() == "/metrics" {
+			return c.Next()
+		}
+		return middleware.GeoIPStat(c)
+	})
+}
+
+// customErrorHandler 自定义错误处理
+func customErrorHandler(c *fiber.Ctx, err error) error {
+	// 获取错误状态码
+	code := fiber.StatusInternalServerError
+	if e, ok := err.(*fiber.Error); ok {
+		code = e.Code
+	}
+
+	// 标准化错误响应
+	response := common.NewResponse(c)
+	switch code {
+	case fiber.StatusNotFound:
+		return response.ErrorWithCode("链接不存在", code)
+	case fiber.StatusMethodNotAllowed:
+		return response.ErrorWithCode("方法不存在", code)
+	case fiber.StatusRequestTimeout:
+		return response.ErrorWithCode("请求超时", code)
+	default:
+		// 生产环境隐藏具体错误信息
+		if env.GetServerConfig().Server.Mode != "debug" {
+			return response.ErrorWithCode("服务器内部错误", code)
+		}
+		return response.ErrorWithCode(err.Error(), code)
+	}
 }

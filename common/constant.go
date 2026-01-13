@@ -11,13 +11,24 @@ const (
 	COMMON_PROJECT_NAME = "gf-game"         // 项目名
 	COMMON_AUTH_SALT    = "GoFurry20250816" // 盐
 	COMMON_AUTH_CURRENT = "currentUser"     // 当前用户
+	COMMON_PROJECT_HELP = `
+GF-Game is a backend service for GoFurry Game Site.
+Usage:
+  ./gf-game [params]
+    - install: install this backend to systemd.
+    - uninstall: uninstall this backend from systemd.
+    - version: show this backend version.
+    - help: show this help message.
+`
 )
 
 // 时间
 const (
-	TIME_FORMAT_DIGIT = "20060102150405"
-	TIME_FORMAT_DATE  = "2006-01-02 15:04:05"
-	TIME_FORMAT_DAY   = "2006-01-02"
+	TIME_FORMAT_DIGIT_DAY = "20060102"
+	TIME_FORMAT_DIGIT     = "20060102150405"
+	TIME_FORMAT_DATE      = "2006-01-02 15:04:05"
+	TIME_FORMAT_DAY       = "2006-01-02"
+	TIME_FORMAT_LOG       = "2006-01-02 15:04:05.000"
 )
 
 // 状态标识
