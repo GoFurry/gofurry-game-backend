@@ -244,7 +244,6 @@ func (s gameService) GetGameInfo(id string, lang string) (res models.GameBaseInf
 	}
 	res.Tags = tags
 
-	// TODO: 查redis拿截图什么的
 	key := "game:"
 	switch lang {
 	case "en":
@@ -271,6 +270,19 @@ func (s gameService) GetGameInfo(id string, lang string) (res models.GameBaseInf
 	res.Movies = gameRecord.Movies
 	res.Screenshots = gameRecord.Screenshots
 	res.Platform = gameRecord.Platforms
+
+	// 在线人数
+	data, err = cs.GetString("game:online" + id)
+	if err != nil {
+		return res, err
+	}
+	var gameOnlineModel models.GameOnlineModel
+	jsonErr = sonic.Unmarshal([]byte(data), &gameOnlineModel)
+	if jsonErr != nil {
+		return res, common.NewServiceError(jsonErr.Error())
+	}
+	res.OnlineCount = gameOnlineModel.Count
+	res.CountCollectTime = gameOnlineModel.CreateTime
 
 	return
 }

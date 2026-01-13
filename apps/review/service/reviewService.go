@@ -38,7 +38,7 @@ func (s reviewService) GetLatestReviewList(lang string) (res []models.AnonymousR
 }
 
 func (s reviewService) AddAnonymousReview(req models.AnonymousReviewRequest, c *fiber.Ctx) common.GFError {
-	if req.ID == "" || req.Content == "" {
+	if req.ID == "" || req.Content == "" || strings.TrimSpace(req.Name) == "" {
 		return common.NewServiceError("入参不能为空")
 	}
 	if req.Score < 0.0 || req.Score > 5.0 {
@@ -46,26 +46,25 @@ func (s reviewService) AddAnonymousReview(req models.AnonymousReviewRequest, c *
 	}
 
 	ip := getClientIP(c)
+	// 无法获取公网 IP 不计数
 	if ip == "" {
-		// 无法获取公网 IP 不计数
 		return common.NewServiceError("IP 为空")
 	}
-	ip = "118.24.117.65"
 	parsedIP := net.ParseIP(ip)
 	if parsedIP == nil {
 		return common.NewServiceError("IP 解析失败")
 	}
 
 	// 检验记录是否存在
-	//_, err := dao.GetReviewDao().GetReviewByIP(req.ID, parsedIP.String())
-	//if err != nil {
-	//	if err.GetMsg() != common.RETURN_RECORD_NOT_FOUND {
-	//		log.Error(err)
-	//		return common.NewServiceError(err.GetMsg())
-	//	}
-	//} else {
-	//	return common.NewServiceError("您的 IP 已评论过该游戏, 需要修改请联系官方人员")
-	//}
+	_, err := dao.GetReviewDao().GetReviewByIPAndName(req.ID, parsedIP.String(), req.Name)
+	if err != nil {
+		if err.GetMsg() != common.RETURN_RECORD_NOT_FOUND {
+			log.Error(err)
+			return common.NewServiceError(err.GetMsg())
+		}
+	} else {
+		return common.NewServiceError("您的 IP + 名称已评论过该游戏, 需要修改请联系官方人员")
+	}
 
 	region, queryErr := queryBaiduIP(parsedIP.String())
 	if queryErr != nil {
@@ -78,11 +77,19 @@ func (s reviewService) AddAnonymousReview(req models.AnonymousReviewRequest, c *
 		return common.NewServiceError(parseErr.Error())
 	}
 
+	// 转换精度为小数后1位
+	formattedStr := fmt.Sprintf("%.1f", req.Score)
+	formattedScore, parseErr := util.String2Float64(formattedStr)
+	if parseErr != nil {
+		log.Error(parseErr)
+		return common.NewServiceError(parseErr.Error())
+	}
+
 	newRecord := models.GfgGameComment{
 		ID:         util.GenerateId(),
 		Region:     region,
 		Content:    req.Content,
-		Score:      req.Score,
+		Score:      formattedScore,
 		CreateTime: cm.LocalTime(time.Now()),
 		GameID:     i64ID,
 		IP:         parsedIP.String(),

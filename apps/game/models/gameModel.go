@@ -198,6 +198,8 @@ type GameBaseInfoVo struct {
 	DetailedDescription string               `json:"detailed_description"`
 	AboutTheGame        string               `json:"about_the_game"`
 	PcRequirements      PcRequirementModel   `json:"pc_requirements"`
+	OnlineCount         int64                `json:"online_count"`
+	CountCollectTime    string               `json:"count_collect_time"`
 }
 
 type NewsVo struct {
@@ -321,4 +323,11 @@ type GameSaveModel struct {
 	PcRequirements      PcRequirementModel   `json:"pc_requirements"`
 
 	CollectDate cm.LocalTime `json:"collect_date"`
+}
+
+type GameOnlineModel struct {
+	ID         int64  `json:"id"`
+	GameID     string `json:"gameId"`
+	Count      int64  `json:"count"`
+	CreateTime string `json:"createTime"`
 }

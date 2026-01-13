@@ -76,8 +76,8 @@ func (dao reviewDao) GetScoreById(id int64) (res models.AvgScoreResult, err comm
 	return res, nil
 }
 
-func (dao reviewDao) GetReviewByIP(id string, ip string) (res models.GfgGameComment, err common.GFError) {
-	db := dao.Gm.Table(models.TableNameGfgGameComment).Where("ip = ? AND game_id = ?", ip, id)
+func (dao reviewDao) GetReviewByIPAndName(id string, ip string, name string) (res models.GfgGameComment, err common.GFError) {
+	db := dao.Gm.Table(models.TableNameGfgGameComment).Where("ip = ? AND game_id = ? AND name = ?", ip, id, name)
 	db.Take(&res)
 
 	if dbErr := db.Take(&res).Error; dbErr != nil {
