@@ -6,9 +6,12 @@ server:
   app_name: "GoFurry-Game" # 名称
   app_version: "v1.0.0" # 版本
   mode: "debug" # debug !debug
-  ip_address: "[::1]" # 服务器 ip
+  ip_address: "192.168.153.1" # 服务器 ip
   port: "9998" # 服务器端口
   memory_limit: 1 # 服务器内存限制
+  gc_percent: 1000  # GC 触发百分比
+  network: "tcp" # 网络类型 tcp/tcp4/tcp6
+  enable_prefork: false  # 是否启用 prefork
 
 auth:
   auth_salt: "GoFurry20251024@wolf" # md5加盐
@@ -46,19 +49,20 @@ database:
   db_host: "192.168.153.121" # 数据库 ip
   db_port: "5432" # 数据库端口
 
+# prometheus
+prometheus:
+  url: "http://148.70.18.111:9090"
+  auth_name: ""
+  auth_pass: ""
+
 # 日志
 log:
-  log_rotation_count: 10 # 日志保存个数
-  log_path: "var/log/gofurry-cloud/log" # 日志保存路径
-  log_level: "debug" # 日志保存级别
-  log_choke_length: 1000 # 日志流长度
-
-# 邮箱
-email:
-  email_host: "smtp.qq.com" # smtp服务地址
-  email_port: 587 # smtp服务端口
-  email_user: "1263842393@qq.com" # 用户名
-  email_password: "ozomtagkwickgebh" # 密钥
+  log_max_size: 100 # 单文件最大长度 MB
+  log_max_backups: 30 # 最大备份数
+  log_max_age: 7 # 最大保存天数
+  log_level: "info" # 日志级别
+  log_mode: "prod" # 日志模式 prod/debug
+  log_path: "./logs/gf-nav.log" # 日志存储路径
 
 # 多线程
 thread:
@@ -67,37 +71,27 @@ thread:
   steam_app_info_thread: 20 # 请求 external
   event_publish_thread: 30 # 事件发布
 
-# github三方
-github:
-  client_id: "Ov23li2Z41kRvA4CKDV2" # OAuth客户端id
-  client_secret: "87ea39897fcd27f236fc6651deebca46999a6999" # 密钥
-  redirect_url: "https://127.0.0.1:9999/api/util/oauth/github" # 请求地址
-
-# gitee三方
-gitee:
-  client_id: "5466d58d2bf296b04ec85026440ac0f65c4378dc95f296a45fe016a7920e6cef" # OAuth客户端id
-  client_secret: "4c228f9eb916546ecc567c3ee071449fa3a5009eed6617f44f685ec2261232fa" # 密钥
-  redirect_url: "https://127.0.0.1:9999/api/util/oauth/gitee" # 请求地址
-
 middleware:
   swagger:
-    is_on: "on" # on off 默认 off
+    is_on: true # 是否启用 Swagger
     file_path: "./docs/swagger.json"
     base_path: "/"
     path: "/swagger"
-    title: "gofurry-nav-api"
+    title: "gofurry-game-api"
   cors:
-    allow_origins: "https://www.go-furry.com,https://go-furry.com"
+    allow_origins: "https://www.go-furry.com,https://go-furry.com,http://127.0.0.1:8888"
+  # 限流器配置
+  limiter:
+    is_on: true # 是否启用限流器
+    max_requests: 3000 # 最大请求数
+    expiration: 60 # 过期时间
 
 waf:
-  waf_switch: "on" # 是否开启 on off
+  waf_switch: true # 是否开启
   conf_path: "./conf/coraza.conf" # 拦截规则配置文件
 
 proxy:
   url: "http://127.0.0.1:7897" # 代理服务器地址
 
 resource:
-  bg_image_path: "E:/test/image" # 背景图片存储地址
-  bg_resize_image_path: "E:/test/image1" # 背景图片存储地址
-  image_exts: ".jpg,.jpeg,.png,.svg,.webp" # 支持图片的格式
   geolite2_path: "./data/"
