@@ -1,9 +1,9 @@
 package middleware
 
 import (
-	"bytes"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -13,17 +13,18 @@ import (
 	"sync"
 
 	"github.com/GoFurry/gofurry-game-backend/common"
-	"github.com/GoFurry/gofurry-game-backend/roof/env"
 	"github.com/corazawaf/coraza/v3"
+	"github.com/corazawaf/coraza/v3/debuglog"
 	"github.com/corazawaf/coraza/v3/experimental"
 	"github.com/corazawaf/coraza/v3/types"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
 )
 
 /*
- * @Desc: Coraza-WAF中间件
+ * @Desc: Fiber Coraza-WAF 中间件
  * @author: 福狼
- * @version: v1.0.1
+ * @version: v1.0.2
  */
 
 // 全局 WAF 单例与初始化锁
@@ -33,27 +34,82 @@ var (
 	wafInitErr error
 )
 
-// initGlobalWAF 初始化全局 WAF 单例
-func initGlobalWAF() {
+// CorazaCfg 中间件配置文件
+type CorazaCfg struct {
+	// 核心配置
+	DirectivesFile string // WAF 规则文件路径
+	RuleEngine     string // 规则引擎模式 (On/Off/DetectionOnly)
+	RootFS         fs.FS  // 文件系统根目录(用于加载规则中的外部文件)
+
+	// 请求体配置
+	RequestBodyAccess        bool // 是否启用请求体访问
+	RequestBodyLimit         int  // 请求体最大字节数 (默认 10M)
+	RequestBodyInMemoryLimit int  // 内存中缓存请求体最大字节数 (默认 128K)
+
+	// 响应体配置
+	ResponseBodyAccess    bool     // 是否启用响应体访问
+	ResponseBodyLimit     int      // 响应体最大字节数 (默认 512K)
+	ResponseBodyMimeTypes []string // 需要处理的响应体 MIME 类型
+
+	// 日志配置
+	DebugLogger    debuglog.Logger // 调试日志器 (可选)
+	EnableErrorLog bool            // 是否启用错误日志回调
+}
+
+// DefaultCorazaCfg 默认配置
+func DefaultCorazaCfg() CorazaCfg {
+	return CorazaCfg{
+		// 核心默认配置
+		DirectivesFile: "./conf/coraza.conf", // 默认规则文件路径
+		RuleEngine:     "On",                 // 默认启用规则引擎 (拦截模式)
+		RootFS:         nil,                  // 默认不设置
+
+		// 请求体默认配置
+		RequestBodyAccess:        true,
+		RequestBodyLimit:         10 * 1024 * 1024, // 10MB
+		RequestBodyInMemoryLimit: 128 * 1024,       // 128KB
+
+		// 响应体默认配置
+		ResponseBodyAccess:    false,      // 默认不启用响应体处理 (性能更好)
+		ResponseBodyLimit:     512 * 1024, // 512KB
+		ResponseBodyMimeTypes: []string{"text/html", "text/plain", "application/json", "application/xml"},
+
+		// 日志默认配置
+		EnableErrorLog: true, // 默认启用错误日志
+	}
+}
+
+// InitGlobalWAFWithCfg 基于配置初始化全局 WAF 单例
+func InitGlobalWAFWithCfg(cfg CorazaCfg) {
 	wafOnce.Do(func() {
-		globalWAF, wafInitErr = createWAF()
+		globalWAF, wafInitErr = createWAFWithCfg(cfg)
+		if wafInitErr != nil {
+			slog.Error("[CorazaWAF] InitGlobalWAFWithCfg Error", wafInitErr.Error())
+		}
 	})
+}
+
+// InitGlobalWAF 传入 Coraza 配置文件路径完成初始化
+func InitGlobalWAF(path ...string) {
+	if len(path) > 0 {
+		InitGlobalWAFWithCfg(CorazaCfg{
+			DirectivesFile: path[0],
+		})
+	} else {
+		InitGlobalWAFWithCfg(DefaultCorazaCfg())
+	}
 }
 
 // CorazaMiddleware 中间件
 func CorazaMiddleware() fiber.Handler {
-	initGlobalWAF()
-
-	return func(context *fiber.Ctx) (err error) {
-
+	return func(c *fiber.Ctx) (err error) {
 		// 直接使用全局 WAF 实例
-
 		if wafInitErr != nil {
-			fmt.Println("WAF全局实例初始化失败: ", wafInitErr)
-			return common.NewResponse(context).ErrorWithCode("WAF 初始化失败", http.StatusInternalServerError)
+			slog.Error("WAF全局实例初始化失败: ", wafInitErr)
+			return common.NewResponse(c).ErrorWithCode("WAF 初始化失败", http.StatusInternalServerError)
 		}
 		if globalWAF == nil {
-			return common.NewResponse(context).ErrorWithCode("WAF 实例未初始化", http.StatusInternalServerError)
+			return common.NewResponse(c).ErrorWithCode("WAF 实例未初始化", http.StatusInternalServerError)
 		}
 
 		// 事件句柄匿名函数
@@ -69,9 +125,10 @@ func CorazaMiddleware() fiber.Handler {
 			}
 		}
 
-		stdReq, err := convertFasthttpToStdRequest(context)
+		// FastHTTP 转换为 HTTP
+		stdReq, err := convertFasthttpToStdRequest(c)
 		if err != nil {
-			return common.NewResponse(context).ErrorWithCode("请求转换失败", http.StatusInternalServerError)
+			return common.NewResponse(c).ErrorWithCode("请求转换失败", http.StatusInternalServerError)
 		}
 
 		// 开启事件
@@ -89,43 +146,30 @@ func CorazaMiddleware() fiber.Handler {
 			}
 		}()
 
-		// 没开规则就返回
+		// 没开规则就放行
 		if tx.IsRuleEngineOff() {
-			return context.Next()
+			return c.Next()
 		}
 
 		// 处理请求
 		if it, err := processRequest(tx, stdReq); err != nil {
+			// 处理失败
 			tx.DebugLogger().Error().Err(err).Msg("Failed to process request")
-			return common.NewResponse(context).ErrorWithCode("WAF处理请求失败", http.StatusInternalServerError)
+			return common.NewResponse(c).ErrorWithCode("WAF 处理请求失败", http.StatusInternalServerError)
 		} else if it != nil {
+			// 拦截成功
 			status := obtainStatusCodeFromInterruptionOrDefault(it, http.StatusOK)
-			context.Status(status)
-			context.Set("X-WAF-Blocked", "true")
-			return common.NewResponse(context).ErrorWithCode("WAF拦截", status)
+			c.Status(status)
+			c.Set("X-WAF-Blocked", "true")
+			return common.NewResponse(c).ErrorWithCode("您的请求存在安全风险, 已被系统拦截.", status)
 		}
 
-		return context.Next()
+		// 放行
+		return c.Next()
 	}
 }
 
-// 创建WAF
-func createWAF() (coraza.WAF, error) {
-	directivesFile := env.GetServerConfig().Waf.ConfPath
-	if s := os.Getenv("DIRECTIVES_FILE"); s != "" {
-		directivesFile = s
-	}
-
-	waf, err := coraza.NewWAF(
-		coraza.NewWAFConfig().
-			WithErrorCallback(logError).
-			WithDirectivesFromFile(directivesFile),
-	)
-
-	return waf, err
-}
-
-// WAF 错误日志
+// logError WAF 错误日志
 func logError(error types.MatchedRule) {
 	slog.Warn("WAF rule matched",
 		slog.String("severity", string(error.Rule().Severity())),
@@ -134,7 +178,7 @@ func logError(error types.MatchedRule) {
 	)
 }
 
-// 处理请求
+// processRequest 拦截部分具体实现操作
 func processRequest(tx types.Transaction, req *http.Request) (*types.Interruption, error) {
 	var (
 		client string
@@ -207,7 +251,7 @@ func processRequest(tx types.Transaction, req *http.Request) (*types.Interruptio
 	return tx.ProcessRequestBody()
 }
 
-// "deny" Action 拒绝策略
+// obtainStatusCodeFromInterruptionOrDefault "deny" Action 拒绝时设置状态码 403
 func obtainStatusCodeFromInterruptionOrDefault(it *types.Interruption, defaultStatusCode int) int {
 	if it.Action == "deny" {
 		statusCode := it.Status
@@ -220,34 +264,83 @@ func obtainStatusCodeFromInterruptionOrDefault(it *types.Interruption, defaultSt
 	return defaultStatusCode
 }
 
+// convertFasthttpToStdRequest 转换请求类型
 func convertFasthttpToStdRequest(c *fiber.Ctx) (*http.Request, error) {
-	// 复制请求体
-	bodyCopy := make([]byte, len(c.Body()))
-	copy(bodyCopy, c.Body())
-
-	uri := c.OriginalURL()
-	fullURL := fmt.Sprintf("%s://%s%s", c.Protocol(), c.Hostname(), uri)
-
-	// 创建标准库请求
-	stdReq, err := http.NewRequest(
-		c.Method(),
-		fullURL,
-		bytes.NewReader(bodyCopy),
-	)
+	stdReq, err := adaptor.ConvertRequest(c, false) // false 表示不自动关闭请求体, 后续需由 WAF 处理
 	if err != nil {
 		return nil, err
 	}
 
-	// 复制请求头
-	c.Request().Header.VisitAll(func(key, value []byte) {
-		stdReq.Header.Add(string(key), string(value))
-	})
-
-	// 获取真实客户端远程地址
 	stdReq.RemoteAddr = net.JoinHostPort(c.IP(), c.Port())
 
-	// 手动设置Host
-	stdReq.Host = c.Hostname()
+	// 手动设置完整 Host
+	if stdReq.Host == "" {
+		stdReq.Host = c.Hostname()
+	}
 
 	return stdReq, nil
+}
+
+// createWAFWithCfg 基于配置创建 WAF 实例
+func createWAFWithCfg(cfg CorazaCfg) (coraza.WAF, error) {
+	// 环境变量
+	if envDirectivesFile := os.Getenv("CORAZA_DIRECTIVES_FILE"); envDirectivesFile != "" {
+		cfg.DirectivesFile = envDirectivesFile
+	}
+
+	// 验证核心配置有效性
+	if cfg.DirectivesFile == "" {
+		slog.Warn("WAF 规则文件路径未配置 (directives_file 为空)")
+		panic("WAF 规则文件路径未配置 (directives_file 为空)")
+	} else {
+		if _, err := os.Stat(cfg.DirectivesFile); os.IsNotExist(err) {
+			slog.Warn("WAF 规则文件不存在: ", cfg.DirectivesFile)
+			panic("WAF 规则文件路径未配置 (directives_file 为空)")
+		}
+	}
+
+	wafConfig := coraza.NewWAFConfig()
+
+	// 错误回调配置
+	if cfg.EnableErrorLog {
+		wafConfig = wafConfig.WithErrorCallback(logError)
+	}
+
+	// 请求体相关配置
+	if cfg.RequestBodyAccess {
+		wafConfig = wafConfig.WithRequestBodyAccess()
+	}
+	if cfg.RequestBodyLimit > 0 {
+		wafConfig = wafConfig.WithRequestBodyLimit(cfg.RequestBodyLimit)
+	}
+	if cfg.RequestBodyInMemoryLimit > 0 {
+		wafConfig = wafConfig.WithRequestBodyInMemoryLimit(cfg.RequestBodyInMemoryLimit)
+	}
+
+	// 响应体相关配置
+	if cfg.ResponseBodyAccess {
+		wafConfig = wafConfig.WithResponseBodyAccess()
+	}
+	if cfg.ResponseBodyLimit > 0 {
+		wafConfig = wafConfig.WithResponseBodyLimit(cfg.ResponseBodyLimit)
+	}
+	if len(cfg.ResponseBodyMimeTypes) > 0 {
+		wafConfig = wafConfig.WithResponseBodyMimeTypes(cfg.ResponseBodyMimeTypes)
+	}
+
+	// 其他可选配置
+	if cfg.RootFS != nil {
+		wafConfig = wafConfig.WithRootFS(cfg.RootFS)
+	}
+	if cfg.DebugLogger != nil {
+		wafConfig = wafConfig.WithDebugLogger(cfg.DebugLogger)
+	}
+
+	// 加载规则文件
+	if cfg.DirectivesFile != "" {
+		wafConfig = wafConfig.WithDirectivesFromFile(cfg.DirectivesFile)
+	}
+
+	// 创建并返回 WAF 实例
+	return coraza.NewWAF(wafConfig)
 }
