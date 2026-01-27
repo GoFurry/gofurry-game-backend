@@ -145,23 +145,21 @@ func (api *gameApi) GetGameRemark(c *fiber.Ctx) error {
 	return common.NewResponse(c).SuccessWithData(data)
 }
 
-//// @Summary 获取游戏的简介HTML
-//// @Schemes
-//// @Description 获取游戏的简介HTML
-//// @Tags Game
-//// @Accept json
-//// @Produce json
-//// @Param id query string true "游戏id"
-//// @Param lang query string true "语言"
-//// @Success 200 {object} models.GameIntroVo
-//// @Router /api/game/info/intro [Get]
-//func (api *gameApi) GetGameIntro(c *fiber.Ctx) error {
-//	num := c.Query("id", "0")
-//	lang := c.Query("lang", "zh")
-//	data, err := service.GetGameService().GetGameIntro(num, lang)
-//	if err != nil {
-//		return common.NewResponse(c).Error(err.GetMsg())
-//	}
-//
-//	return common.NewResponse(c).SuccessWithData(data)
-//}
+// @Summary 获取游戏创作者列表
+// @Schemes
+// @Description 获取游戏创作者列表
+// @Tags Game
+// @Accept json
+// @Produce json
+// @Param lang query string true "语言"
+// @Success 200 {object} []models.CreatorVo
+// @Router /api/game/creator [Get]
+func (api *gameApi) GetGameCreator(c *fiber.Ctx) error {
+	lang := c.Query("lang", "zh")
+	data, err := service.GetGameService().GetGameCreator(lang)
+	if err != nil {
+		return common.NewResponse(c).Error(err.GetMsg())
+	}
+
+	return common.NewResponse(c).SuccessWithData(data)
+}

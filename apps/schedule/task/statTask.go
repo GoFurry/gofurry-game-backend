@@ -1,6 +1,7 @@
 package task
 
 import (
+	"encoding/json"
 	"time"
 
 	gd "github.com/GoFurry/gofurry-game-backend/apps/game/dao"
@@ -10,6 +11,7 @@ import (
 	"github.com/GoFurry/gofurry-game-backend/apps/schedule/models"
 	"github.com/GoFurry/gofurry-game-backend/common"
 	"github.com/GoFurry/gofurry-game-backend/common/log"
+	cm "github.com/GoFurry/gofurry-game-backend/common/models"
 	cs "github.com/GoFurry/gofurry-game-backend/common/service"
 	"github.com/GoFurry/gofurry-game-backend/common/util"
 	"github.com/bytedance/sonic"
@@ -203,4 +205,78 @@ func UpdateGameNewsCache() {
 	}
 
 	log.Info("StatTask UpdateGameNewsCache 结束...")
+}
+
+func UpdateGameCreatorCache() {
+	log.Info("StatTask UpdateGameCreatorCache 开始...")
+
+	newRecord := gm.UpdateCreatorVo{}
+
+	records, err := gd.GetGameCreatorDao().GetGameCreator("zh")
+	if err != nil {
+		log.Error("GetGameCreator err:", err)
+		return
+	}
+	res, jsonErr := parseGameCreator(records)
+	if jsonErr != nil {
+		log.Error("GetGameCreator err:", jsonErr)
+		return
+	}
+	newRecord.CreatorZh = res
+
+	records, err = gd.GetGameCreatorDao().GetGameCreator("en")
+	if err != nil {
+		log.Error("GetGameCreator err:", err)
+		return
+	}
+	res, jsonErr = parseGameCreator(records)
+	if jsonErr != nil {
+		log.Error("GetGameCreator err:", jsonErr)
+		return
+	}
+	newRecord.CreatorEn = res
+
+	if jsonRecord, jsonErr := sonic.Marshal(newRecord); jsonErr == nil {
+		cs.SetExpire("game-creator:list", string(jsonRecord), 12*time.Hour)
+	}
+
+	log.Info("StatTask UpdateGameCreatorCache 结束...")
+}
+
+func parseGameCreator(records []gm.TempCreator) (res []gm.CreatorVo, err error) {
+	for _, r := range records {
+		vo := gm.CreatorVo{
+			ID:         util.Int642String(r.ID),
+			Name:       r.Name,
+			Info:       r.Info,
+			URL:        r.URL,
+			Avatar:     r.Avatar,
+			Type:       r.Type,
+			CreateTime: r.CreateTime,
+			UpdateTime: r.UpdateTime,
+		}
+
+		// 解析 Links JSON 字段
+		if r.Links != nil && *r.Links != "" {
+			var links []cm.KvModel
+			if jsonErr := json.Unmarshal([]byte(*r.Links), &links); jsonErr != nil {
+				return res, jsonErr
+			} else {
+				vo.Links = links
+			}
+		}
+
+		// 解析 Contact JSON 字段
+		if r.Contact != nil && *r.Contact != "" {
+			var contact []cm.KvModel
+			if jsonErr := json.Unmarshal([]byte(*r.Contact), &contact); jsonErr != nil {
+				return res, jsonErr
+			} else {
+				vo.Contact = contact
+			}
+		}
+
+		res = append(res, vo)
+	}
+	return
 }

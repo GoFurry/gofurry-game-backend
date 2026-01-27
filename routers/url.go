@@ -25,9 +25,13 @@ func gameApi(g fiber.Router) {
 	g.Get("/remark", game.GameApi.GetGameRemark) // 获取单条游戏的评论
 
 	g.Get("/tag/list", game.GameApi.GetTagList) // 获取标签列表
+
+	g.Get("/creator", game.GameApi.GetGameCreator) // 获取相关开发者列表
 }
 
 func recommendApi(g fiber.Router) {
+	// TODO: 标签表新增一个权重字段
+
 	// 基于内容的推荐（Content-based Filtering）
 	// 优点: 存储小 速度快 无冷启动 无需用户行为数据
 	// 缺点: 需要传入初始物品, 特征值永远为静态, 每次推荐相同

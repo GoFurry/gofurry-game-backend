@@ -40,4 +40,6 @@ func ScheduleByOneHour() {
 	task.UpdateGamePanelCache()
 	// 缓存更新公告数据
 	task.UpdateGameNewsCache()
+	// 缓存创作者数据
+	task.UpdateGameCreatorCache()
 }

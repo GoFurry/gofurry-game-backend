@@ -304,20 +304,22 @@ func (s gameService) GetGameRemark(id string) (res models.GameRemarkVo, err comm
 	return
 }
 
-//func (s gameService) GetGameIntro(id string, lang string) (res models.GameIntroVo, err common.GFError) {
-//	intId, parseErr := util.String2Int64(id)
-//	if parseErr != nil {
-//		return res, common.NewServiceError("Game ID 转换有误")
-//	}
-//	introRecord, err := dao.NewGameIntroDao().GetByGameIDAndLang(context.Background(), intId, lang)
-//	if err != nil {
-//		return res, err
-//	}
-//	res.Content = introRecord.Content
-//	if !introRecord.UpdateTime.IsZero() {
-//		res.UpdateTime = cm.LocalTime(introRecord.UpdateTime)
-//	} else {
-//		res.UpdateTime = cm.LocalTime{}
-//	}
-//	return
-//}
+func (s gameService) GetGameCreator(lang string) (res []models.CreatorVo, err common.GFError) {
+	record, err := cs.GetString("game-creator:list")
+	if err != nil {
+		return res, err
+	}
+	var gameCreatorModel models.UpdateCreatorVo
+	jsonErr := sonic.Unmarshal([]byte(record), &gameCreatorModel)
+	if jsonErr != nil {
+		return res, common.NewServiceError(jsonErr.Error())
+	}
+	switch lang {
+	case "en":
+		res = gameCreatorModel.CreatorEn
+	case "zh":
+		res = gameCreatorModel.CreatorZh
+	}
+
+	return
+}
